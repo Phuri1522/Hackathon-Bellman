@@ -1,21 +1,68 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState } from "react"
+import { useNavigate } from "react-router-dom"
+import { useAuth } from "../contexts/AuthContext"
+import { authService } from "../services/auth.service"
 
 export default function SignUpUser() {
-  const navigate = useNavigate();
-  const [form, setForm] = useState({ name: "", email: "", password: "", confirm: "" });
-  const [error, setError] = useState("");
+  const navigate = useNavigate()
+  const { login } = useAuth()
+  const [form, setForm] = useState({ name: "", email: "", password: "", confirm: "" })
+  const [emailAvailable, setEmailAvailable] = useState<boolean | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+
+  const validate = () => {
+    const errors: Record<string, string> = {}
+    if (!form.name) errors.name = "Name is required"
+    if (!form.email) errors.email = "Email is required"
+    else if (!/\S+@\S+\.\S+/.test(form.email)) errors.email = "Invalid email format"
+    else if (emailAvailable === false) errors.email = "Email already in use"
+    if (!form.password) errors.password = "Password is required"
+    else if (form.password.length < 6) errors.password = "Password must be at least 6 characters"
+    if (!form.confirm) errors.confirm = "Please confirm your password"
+    else if (form.password !== form.confirm) errors.confirm = "Passwords do not match"
+    return errors
+  }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-    setError("");
-  };
+    setForm({ ...form, [e.target.name]: e.target.value })
+    setFieldErrors((prev) => ({ ...prev, [e.target.name]: "" }))
+  }
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (form.password !== form.confirm) { setError("Passwords do not match"); return; }
-    console.log("Register user:", form); // TODO: integrate API
-  };
+  const handleEmailBlur = async () => {
+    if (!form.email) return
+    if (!/\S+@\S+\.\S+/.test(form.email)) {
+      setFieldErrors((prev) => ({ ...prev, email: "Invalid email format" }))
+      return
+    }
+    try {
+      const available = await authService.checkEmail(form.email)
+      setEmailAvailable(available)
+      if (!available) setFieldErrors((prev) => ({ ...prev, email: "Email already in use" }))
+      else setFieldErrors((prev) => ({ ...prev, email: "" }))
+    } catch { setEmailAvailable(null) }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const errors = validate()
+    if (Object.keys(errors).length > 0) { setFieldErrors(errors); return }
+    setLoading(true)
+    try {
+      const res = await authService.registerUser({
+        name: form.name, email: form.email, password: form.password,
+      })
+      login(res.token, res.user)
+      navigate("/UserHome")
+    } catch (err: any) {
+      setFieldErrors({ submit: err.response?.data?.message ?? "Registration failed" })
+    } finally { setLoading(false) }
+  }
+
+  const inputClass = (field: string) =>
+    `bg-[#0f1115] border rounded px-3 py-2 text-[#e5e7eb] text-sm outline-none transition-colors placeholder:text-[#4b5563] ${
+      fieldErrors[field] ? "border-[#b7410e]" : "border-[#2d3748] focus:border-[#39ff14]"
+    }`
 
   return (
     <div className="min-h-screen bg-[#050505] flex">
@@ -46,25 +93,48 @@ export default function SignUpUser() {
           <h1 className="text-[#39ff14] text-2xl font-bold mb-1 tracking-widest" style={{ fontFamily: "Orbitron, monospace" }}>CREATE ACCOUNT</h1>
           <p className="text-[#9ca3af] text-xs mb-6" style={{ fontFamily: "Fira Code, monospace" }}>// USER PROFILE</p>
 
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            {[
-              { label: "Name", name: "name", type: "text", placeholder: "Your full name" },
-              { label: "Email", name: "email", type: "email", placeholder: "your@email.com" },
-              { label: "Password", name: "password", type: "password", placeholder: "Create password" },
-              { label: "Confirm", name: "confirm", type: "password", placeholder: "Confirm password" },
-            ].map((f) => (
-              <div key={f.name} className="flex flex-col gap-1">
-                <label className="text-[#9ca3af] text-xs" style={{ fontFamily: "Fira Code, monospace" }}>{f.label}</label>
-                <input type={f.type} name={f.name} placeholder={f.placeholder}
-                  value={form[f.name as keyof typeof form]} onChange={handleChange} required
-                  className={`bg-[#0f1115] border rounded px-3 py-2 text-[#e5e7eb] text-sm outline-none transition-colors placeholder:text-[#4b5563] ${
-                    f.name === "confirm" && error ? "border-[#b7410e]" : "border-[#2d3748] focus:border-[#39ff14]"}`}
-                  style={{ fontFamily: "Fira Code, monospace" }} />
-              </div>
-            ))}
-            {error && <p className="text-[#b7410e] text-xs -mt-2" style={{ fontFamily: "Fira Code, monospace" }}>{error}</p>}
-            <button type="submit" className="bg-[#39ff14] text-black font-bold py-2 rounded tracking-widest text-sm mt-1 hover:brightness-110 active:scale-95 transition-all" style={{ fontFamily: "Orbitron, monospace" }}>
-              CREATE ACCOUNT
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
+            <div className="flex flex-col gap-1">
+              <label className="text-[#9ca3af] text-xs" style={{ fontFamily: "Fira Code, monospace" }}>Name</label>
+              <input type="text" name="name" placeholder="Your full name" value={form.name} onChange={handleChange}
+                className={inputClass("name")} style={{ fontFamily: "Fira Code, monospace" }} />
+              {fieldErrors.name && <p className="text-[#b7410e] text-xs" style={{ fontFamily: "Fira Code, monospace" }}>✗ {fieldErrors.name}</p>}
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-[#9ca3af] text-xs" style={{ fontFamily: "Fira Code, monospace" }}>Email</label>
+              <input type="email" name="email" placeholder="your@email.com" value={form.email}
+                onChange={handleChange} onBlur={handleEmailBlur}
+                className={`bg-[#0f1115] border rounded px-3 py-2 text-[#e5e7eb] text-sm outline-none transition-colors placeholder:text-[#4b5563] ${
+                  fieldErrors.email ? "border-[#b7410e]" :
+                  emailAvailable === true ? "border-[#39ff14]" :
+                  "border-[#2d3748] focus:border-[#39ff14]"
+                }`}
+                style={{ fontFamily: "Fira Code, monospace" }} />
+              {fieldErrors.email && <p className="text-[#b7410e] text-xs" style={{ fontFamily: "Fira Code, monospace" }}>✗ {fieldErrors.email}</p>}
+              {!fieldErrors.email && emailAvailable === true && <p className="text-[#39ff14] text-xs" style={{ fontFamily: "Fira Code, monospace" }}>✓ Available</p>}
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-[#9ca3af] text-xs" style={{ fontFamily: "Fira Code, monospace" }}>Password</label>
+              <input type="password" name="password" placeholder="Min 6 characters" value={form.password} onChange={handleChange}
+                className={inputClass("password")} style={{ fontFamily: "Fira Code, monospace" }} />
+              {fieldErrors.password && <p className="text-[#b7410e] text-xs" style={{ fontFamily: "Fira Code, monospace" }}>✗ {fieldErrors.password}</p>}
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-[#9ca3af] text-xs" style={{ fontFamily: "Fira Code, monospace" }}>Confirm</label>
+              <input type="password" name="confirm" placeholder="Confirm password" value={form.confirm} onChange={handleChange}
+                className={inputClass("confirm")} style={{ fontFamily: "Fira Code, monospace" }} />
+              {fieldErrors.confirm && <p className="text-[#b7410e] text-xs" style={{ fontFamily: "Fira Code, monospace" }}>✗ {fieldErrors.confirm}</p>}
+            </div>
+
+            {fieldErrors.submit && <p className="text-[#b7410e] text-xs" style={{ fontFamily: "Fira Code, monospace" }}>✗ {fieldErrors.submit}</p>}
+
+            <button type="submit" disabled={loading}
+              className="bg-[#39ff14] text-black font-bold py-2 rounded tracking-widest text-sm mt-1 hover:brightness-110 active:scale-95 transition-all disabled:opacity-50"
+              style={{ fontFamily: "Orbitron, monospace" }}>
+              {loading ? "LOADING..." : "REGISTER AS USER"}
             </button>
           </form>
 
@@ -74,5 +144,5 @@ export default function SignUpUser() {
         </div>
       </div>
     </div>
-  );
+  )
 }
