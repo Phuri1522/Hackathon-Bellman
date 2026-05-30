@@ -53,7 +53,7 @@ export default function SignUpUser() {
         name: form.name, email: form.email, password: form.password,
       })
       login(res.token, res.user)
-      navigate("/UserHome")
+      navigate("/home")
     } catch (err: any) {
       setFieldErrors({ submit: err.response?.data?.message ?? "Registration failed" })
     } finally { setLoading(false) }
