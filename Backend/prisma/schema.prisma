@@ -30,7 +30,6 @@ model Hunter {
   rank                 String   @default("D")
   rankScore            Float    @default(0)
   autoMatch            Boolean  @default(false)
-  autoMatchPreferences String?
   currentLat           Float?
   currentLng           Float?
 
