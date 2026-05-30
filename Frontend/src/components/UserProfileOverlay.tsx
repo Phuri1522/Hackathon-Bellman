@@ -65,7 +65,6 @@ export default function UserProfileOverlay({ user, onClose }: Props) {
         </div>
 
         {/* Info */}
-        // Edit mode เหลือแค่ avatar
         {!isEditing ? (
         <div className="flex flex-col gap-3">
             {[

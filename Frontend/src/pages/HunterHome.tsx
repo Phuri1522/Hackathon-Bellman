@@ -1,6 +1,6 @@
 // pages/HunterHome.tsx
 import { useState } from "react";
-import HunterProfileOverlay from "../components/HunterprofileOverlay";
+import HunterProfileOverlay from "../components/HunterProfileOverlay";
 import SidebarLayout from "../components/SidebarLayout";
 
 const mockHunter = {
