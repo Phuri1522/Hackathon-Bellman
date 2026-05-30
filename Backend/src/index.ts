@@ -5,6 +5,8 @@ import authRouter from "./routes/auth.route.js";
 import hunterRouter from "./modules/hunt-matching/routers/hunter.route.js";
 import huntRequestRouter from "./modules/hunt-matching/routers/huntRequest.route.js";
 import userRouter from "./modules/hunt-matching/routers/user.route.js"
+import mutantHuntingRequestRouter from "./modules/MutantHuntingRequestSystem/routes/MutantHuntingRequestSystem.routes.js";
+import authRouter from "./routes/auth.route.js"; // ดึงไฟล์เราเตอร์มา
 
 dotenv.config();
 
@@ -18,6 +20,8 @@ app.use("/api/auth", authRouter);
 app.use("/api/hunters", hunterRouter);
 app.use("/api/hunt-requests", huntRequestRouter);
 app.use("/api/users", userRouter)
+app.use("/api", mutantHuntingRequestRouter);
+
 app.get("/", (req, res) => {
   res.send("Ready");
 });
