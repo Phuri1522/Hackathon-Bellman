@@ -25,7 +25,17 @@ export default function CreatePostForm() {
             </div>
 
             <div className="mb-2">
-                <SelectInput label="Required Classes" options={HUNTER_CLASSES} />
+                <div className="mb-2">
+                    <label className="mb-2 block text-xs text-[#e5e7eb]">
+                        Required Class
+                    </label>
+
+                    <input
+                        value="Fighter"
+                        readOnly
+                        className="w-full cursor-not-allowed rounded border border-[#2d3748] bg-[#050505] px-4 py-2 text-[#39ff14]"
+                    />
+                </div>
             </div>
 
             <ImageUploadBox />
