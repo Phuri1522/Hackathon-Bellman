@@ -1,11 +1,22 @@
 import PostPinOverlay from "./PostPinOverlay";
+import RealMap from "./RealMap";
 import type { MouseEvent } from "react";
+import type { MapPoint } from "../types/mutantHunting.type";
 
 type LocationPickerProps = {
   showMiniOverlay?: boolean;
   showOverlay?: boolean;
   onPinClick?: (e: MouseEvent) => void;
   onMiniClick?: (e: MouseEvent) => void;
+  userLocation?: MapPoint;
+  selectedPin?: MapPoint | null;
+  onMapClick?: (point: MapPoint) => void;
+  showPreviewOverlay?: boolean;
+  previewImage?: string | null;
+  previewTitle?: string;
+  onPreviewClick?: (e: MouseEvent) => void;
+  zoom?: number;
+  markerLabel?: string;
 };
 
 export default function LocationPicker({
@@ -13,8 +24,35 @@ export default function LocationPicker({
   onMiniClick,
   showMiniOverlay = false,
   showOverlay,
+  userLocation,
+  selectedPin,
+  onMapClick,
+  showPreviewOverlay,
+  previewImage,
+  previewTitle,
+  onPreviewClick,
+  zoom,
+  markerLabel,
 }: LocationPickerProps) {
   const shouldShowMiniOverlay = showMiniOverlay || showOverlay;
+
+  if (userLocation) {
+    return (
+      <section className="relative h-full w-full overflow-hidden border border-[#39ff14]/40 bg-[#06140b]">
+        <RealMap
+          userLocation={userLocation}
+          selectedPin={selectedPin}
+          onMapClick={onMapClick}
+          showPreviewOverlay={showPreviewOverlay}
+          previewImage={previewImage}
+          previewTitle={previewTitle}
+          onPreviewClick={onPreviewClick}
+          zoom={zoom}
+          markerLabel={markerLabel}
+        />
+      </section>
+    );
+  }
 
   return (
     <section className="relative h-full w-full overflow-hidden border border-[#39ff14]/40 bg-[#06140b]">
