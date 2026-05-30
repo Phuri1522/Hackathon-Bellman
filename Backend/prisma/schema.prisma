@@ -24,7 +24,6 @@ model Hunter {
   id                   Int      @id @default(autoincrement())
   userId               Int      @unique
   user                 User     @relation(fields: [userId], references: [id])
-  avatarUrl            String?
   gender               String
   age                  Int
   class                String
