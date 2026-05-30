@@ -4,7 +4,7 @@ export interface CreateMutantHuntingRequestBody {
   userId?: number;
   animalType: string;
   mutantType: string;
-  requiredClass: string;
+  requiredClass?: string;
   reward?: string;
   description?: string;
   imageUrl?: string;

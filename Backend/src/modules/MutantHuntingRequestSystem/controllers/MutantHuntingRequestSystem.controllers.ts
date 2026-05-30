@@ -13,6 +13,40 @@ const VALID_STATUSES: MutantHuntingRequestStatus[] = [
   "COMPLETED",
 ];
 
+const normalizeType = (value: string): string => value.trim().toLowerCase();
+
+const uniqueClasses = (classes: string[]): string[] => [...new Set(classes)];
+
+const calculateRequiredClasses = (animalType: string): string[] => {
+  const animal = normalizeType(animalType);
+
+  if (animal === "wolf") {
+    return ["Fighter"];
+  }
+
+  if (animal === "bear" || animal === "boar") {
+    return ["Tanker"];
+  }
+
+  if (animal === "snake" || animal === "spider") {
+    return ["Ranger"];
+  }
+
+  if (animal === "tiger") {
+    return uniqueClasses(["Fighter", "Ranger"]);
+  }
+
+  if (animal === "rhino") {
+    return uniqueClasses(["Fighter", "Tanker"]);
+  }
+
+  if (animal === "dragon") {
+    return uniqueClasses(["Fighter", "Ranger", "Tanker"]);
+  }
+
+  return ["Fighter"];
+};
+
 const parseNumericId = (id: unknown): number | null => {
   if (Array.isArray(id)) {
     return null;
@@ -74,13 +108,12 @@ export const createMutantHuntingRequest = async (
     if (
       !body.animalType ||
       !body.mutantType ||
-      !body.requiredClass ||
       latitude === null ||
       longitude === null
     ) {
       res.status(400).json({
         message:
-          "animalType, mutantType, requiredClass, latitude, and longitude are required",
+          "animalType, mutantType, latitude, and longitude are required",
       });
       return;
     }
@@ -90,12 +123,15 @@ export const createMutantHuntingRequest = async (
       return;
     }
 
+    const requiredClasses = calculateRequiredClasses(body.animalType);
+    const classRequired = requiredClasses.join(",");
+
     const request = await prisma.post.create({
       data: {
         userId,
         animalType: body.animalType,
         mutantType: body.mutantType,
-        classRequired: body.requiredClass,
+        classRequired,
         reward: body.reward,
         description: body.description,
         picture: imageUrl,
@@ -107,6 +143,8 @@ export const createMutantHuntingRequest = async (
 
     res.status(201).json({
       message: "Mutant hunting request created successfully",
+      classRequired,
+      requiredClasses,
       data: request,
     });
   } catch (error) {
