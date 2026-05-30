@@ -3,6 +3,7 @@ import ImageUploadBox from "./ImageUploadBox";
 import CancelButton from "./CancelButton";
 import SubmitSightingButton from "./SubmitSightingButton";
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { createMutantHuntingRequest } from "../mutantHunting.api";
 
 import {
@@ -12,7 +13,7 @@ import {
     type MapPoint,
 } from "../types/mutantHunting.type";
 
-const DEFAULT_IMAGE_URL = "https://example.com/mutant.jpg";
+const DEFAULT_IMAGE_URL = "https://images.unsplash.com/photo-1546182990-dffeafbe841d";
 const STATIC_USER_ID = 1;
 
 type HunterClass = "FIGHTER" | "TANKER" | "RANGER";
@@ -52,6 +53,7 @@ export default function CreatePostForm({
     distanceKm,
     onPreviewChange,
 }: CreatePostFormProps) {
+    const navigate = useNavigate();
     const [showSuccess, setShowSuccess] = useState(false);
     const [showError, setShowError] = useState(false);
     const [errorMessage, setErrorMessage] = useState("Failed to submit post");
@@ -120,10 +122,11 @@ export default function CreatePostForm({
 
             resetForm();
             setShowSuccess(true);
+            window.dispatchEvent(new Event("mutant-hunting-request-created"));
 
-            setTimeout(() => {
-                setShowSuccess(false);
-            }, 2500);
+            navigate("/home", {
+                state: { mutantHuntingRefreshAt: Date.now() },
+            });
         } catch {
             setErrorMessage("Failed to submit post");
             setShowError(true);
@@ -216,7 +219,7 @@ export default function CreatePostForm({
                 preview={imagePreview}
                 onImageChange={(nextImageUrl) => {
                     setImagePreview(nextImageUrl);
-                    setImageUrl(DEFAULT_IMAGE_URL);
+                    setImageUrl(nextImageUrl);
                 }}
             />
 

@@ -50,3 +50,19 @@ export type MutantPostPreview = {
   reward: string;
   requiredClasses: string[];
 };
+
+export type MutantHuntingRequest = {
+  id: number;
+  userId: number;
+  animalType: string;
+  mutantType: string;
+  latitude: number;
+  longitude: number;
+  picture?: string | null;
+  imageUrl?: string | null;
+  description?: string | null;
+  classRequired: string;
+  reward?: string | null;
+  status: string;
+  createdAt?: string;
+};

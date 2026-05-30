@@ -116,7 +116,7 @@ export default function Home() {
 
   return (
     <SidebarLayout
-      map={<HunterMap />}
+      map={<HunterMap role={isHunter ? "hunter" : "user"} />}
       sidebar={
         isHunter && user.hunter ? (
           <HunterSidebar

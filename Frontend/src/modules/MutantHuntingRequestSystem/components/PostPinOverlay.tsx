@@ -34,6 +34,10 @@ export default function PostPinOverlay({
         src={overlayImage}
         alt={overlayTitle}
         className={imageClassName}
+        onError={(event) => {
+          event.currentTarget.src =
+            "https://images.unsplash.com/photo-1546182990-dffeafbe841d";
+        }}
       />
 
       <h2 className="mt-3 text-center text-lg font-bold text-[#39ff14]">
