@@ -31,11 +31,12 @@ export default function AppRouter() {
           {/* User Only */}
           <Route
             path="/user/home"
-            element={
-              <ProtectedRoute allowedRoles={["User"]}>
-                <HomeUser />
-              </ProtectedRoute>
-            }
+            element={<HomeUser />}
+            // element={
+            //   <ProtectedRoute allowedRoles={["User"]}>
+            //     <HomeUser />
+            //   </ProtectedRoute>
+            // }
           />
           <Route
             path="/user/create-post"
@@ -57,11 +58,12 @@ export default function AppRouter() {
           {/* Hunter Only */}
           <Route
             path="/hunter/home"
-            element={
-              <ProtectedRoute allowedRoles={["Hunter"]}>
-                <HomeHunter />
-              </ProtectedRoute>
-            }
+            element={<HomeHunter />}
+            // element={
+            //   <ProtectedRoute allowedRoles={["Hunter"]}>
+            //     <HomeHunter />
+            //   </ProtectedRoute>
+            // }
           />
 
           <Route path="*" element={<NotFoundPage />} />
