@@ -1,4 +1,8 @@
-export type MutantHuntingRequestStatus = "OPEN" | "ACCEPTED" | "COMPLETED";
+export type MutantHuntingRequestStatus =
+  | "MATCHMAKING"
+  | "PUBLIC"
+  | "ACCEPTED"
+  | "COMPLETED";
 
 export interface CreateMutantHuntingRequestBody {
   userId?: number;
