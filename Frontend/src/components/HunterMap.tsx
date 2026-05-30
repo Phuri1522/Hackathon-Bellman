@@ -84,38 +84,20 @@ function MapClickCloser({ onClose }: { onClose: () => void }) {
   return null
 }
 
-function MapCenterUpdater({
-  center,
-  enabled,
-}: {
-  center: MapPoint
-  enabled: boolean
-}) {
-  const map = useMap()
-
-  useEffect(() => {
-    if (!enabled) return
-
-    map.setView([center.lat, center.lng], map.getZoom())
-  }, [center.lat, center.lng, enabled, map])
-
-  return null
-}
-
 function SelectedPostMapController({
-  selectedPost,
+  focusTarget,
   focusRequest,
 }: {
-  selectedPost: MutantHuntingRequest | null
+  focusTarget: MapPoint | null
   focusRequest: number
 }) {
   const map = useMap()
 
   useEffect(() => {
-    if (!selectedPost || focusRequest === 0) return
+    if (!focusTarget || focusRequest === 0) return
 
-    map.flyTo([selectedPost.latitude, selectedPost.longitude], Math.max(map.getZoom(), 15))
-  }, [focusRequest, map, selectedPost])
+    map.flyTo([focusTarget.lat, focusTarget.lng], Math.max(map.getZoom(), 15))
+  }, [focusRequest, focusTarget, map])
 
   return null
 }
@@ -178,6 +160,7 @@ export default function HunterMap({ role = "hunter" }: HunterMapProps) {
   const [showDetails, setShowDetails] = useState(false)
   const [userLocation, setUserLocation] = useState<MapPoint>(BANGKOK_LOCATION)
   const [focusRequest, setFocusRequest] = useState(0)
+  const [focusTarget, setFocusTarget] = useState<MapPoint | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [notification, setNotification] = useState<string | null>(null)
 
@@ -245,6 +228,12 @@ export default function HunterMap({ role = "hunter" }: HunterMapProps) {
   }
 
   function handleViewMap() {
+    if (!selectedPost) return
+
+    setFocusTarget({
+      lat: selectedPost.latitude,
+      lng: selectedPost.longitude,
+    })
     setFocusRequest((current) => current + 1)
   }
 
@@ -289,9 +278,8 @@ export default function HunterMap({ role = "hunter" }: HunterMapProps) {
           attributionControl={false}
           className="h-full w-full"
         >
-          <MapCenterUpdater center={userLocation} enabled={!showDetails} />
           <SelectedPostMapController
-            selectedPost={selectedPost}
+            focusTarget={focusTarget}
             focusRequest={focusRequest}
           />
           <MapClickCloser onClose={handleMapSpaceClick} />
