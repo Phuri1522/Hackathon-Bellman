@@ -3,8 +3,8 @@ import { useNavigate } from "react-router-dom"
 import { useAuth } from "../contexts/AuthContext"
 import api from "../services/api"
 import SidebarLayout from "../components/SidebarLayout"
-import UserSidebar from "../components/UserSidebar"
-import HunterSidebar from "../components/HunterSidebar"
+import UserSidebar from "../components/Usersidebar"
+import HunterSidebar from "../components/Huntersidebar"
 import HunterMap from "../components/HunterMap"
 
 interface Post {
@@ -116,7 +116,7 @@ export default function Home() {
 
   return (
     <SidebarLayout
-      map={<HunterMap role={isHunter ? "hunter" : "user"} />}
+      map={<HunterMap isHunter={isHunter} />}
       sidebar={
         isHunter && user.hunter ? (
           <HunterSidebar

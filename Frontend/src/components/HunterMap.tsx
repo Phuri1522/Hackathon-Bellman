@@ -1,367 +1,263 @@
-import "leaflet/dist/leaflet.css"
-import { divIcon } from "leaflet"
-import { useCallback, useEffect, useMemo, useState } from "react"
-import { useLocation } from "react-router-dom"
-import {
-  MapContainer,
-  Marker,
-  TileLayer,
-  Tooltip,
-  useMap,
-  useMapEvents,
-} from "react-leaflet"
-import PostPinOverlay from "../modules/MutantHuntingRequestSystem/components/PostPinOverlay"
-import UserPostDetails from "../modules/MutantHuntingRequestSystem/components/UserPostDetails"
-import HunterPostDetails from "../modules/MutantHuntingRequestSystem/components/HunterPostDetails"
-import {
-  deleteMutantHuntingRequest,
-  getMutantHuntingRequests,
-} from "../modules/MutantHuntingRequestSystem/mutantHunting.api"
-import type {
-  MapPoint,
-  MutantHuntingRequest,
-} from "../modules/MutantHuntingRequestSystem/types/mutantHunting.type"
+import { useEffect, useRef, useState } from "react";
+import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from "react-leaflet";
+import { divIcon } from "leaflet";
+import "leaflet/dist/leaflet.css";
+import { getMapMarkers } from "../apis/map";
+import type { MapMarkerData } from "../types/map";
 
-type Role = "user" | "hunter"
-
-type HunterMapProps = {
-  role?: Role
+// ─── Props ───────────────────────────────────────────────────────────────────
+interface HunterMapProps {
+  isHunter?: boolean;
 }
 
-const BANGKOK_LOCATION: MapPoint = {
-  lat: 13.7563,
-  lng: 100.5018,
-}
-
-const defaultCenter: [number, number] = [BANGKOK_LOCATION.lat, BANGKOK_LOCATION.lng]
-
+// ─── Leaflet Custom Icons ─────────────────────────────────────────────────────
+// ใช้ divIcon เหมือนกับที่เพื่อนออกแบบใน RealMap.tsx (สีส้ม = mutant marker)
 const mutantIcon = divIcon({
   className: "",
-  html: '<div style="height:18px;width:18px;border-radius:9999px;background:#b7410e;border:2px solid #050505;box-shadow:0 0 18px #b7410e;"></div>',
+  html: `<div style="
+    height:18px;
+    width:18px;
+    border-radius:9999px;
+    background:#b7410e;
+    border:2px solid #050505;
+    box-shadow:0 0 18px #b7410e;
+    cursor:pointer;
+  "></div>`,
   iconSize: [18, 18],
   iconAnchor: [9, 9],
-})
+});
 
-const userLocationIcon = divIcon({
-  className: "",
-  html: '<div style="height:16px;width:16px;border-radius:9999px;background:#39ff14;border:2px solid #050505;box-shadow:0 0 18px #39ff14;"></div>',
-  iconSize: [16, 16],
-  iconAnchor: [8, 8],
-})
-
-function getPostTitle(post: MutantHuntingRequest) {
-  return `${post.mutantType} ${post.animalType}`
-}
-
-function toRadians(value: number) {
-  return (value * Math.PI) / 180
-}
-
-function calculateDistanceKm(from: MapPoint, to: MapPoint) {
-  const earthRadiusKm = 6371
-  const latDistance = toRadians(to.lat - from.lat)
-  const lngDistance = toRadians(to.lng - from.lng)
-  const fromLat = toRadians(from.lat)
-  const toLat = toRadians(to.lat)
-
-  const haversine =
-    Math.sin(latDistance / 2) * Math.sin(latDistance / 2) +
-    Math.cos(fromLat) *
-      Math.cos(toLat) *
-      Math.sin(lngDistance / 2) *
-      Math.sin(lngDistance / 2)
-
-  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine))
-}
-
-function MapClickCloser({ onClose }: { onClose: () => void }) {
-  useMapEvents({
-    click() {
-      onClose()
-    },
-  })
-
-  return null
-}
-
-function SelectedPostMapController({
-  focusTarget,
-  focusRequest,
+// ─── Overlay Component ────────────────────────────────────────────────────────
+// แปลง lat/lng → pixel แล้ว render PostPinOverlay style popup ลอยเหนือ marker
+function PostOverlay({
+  marker,
+  isHunter,
+  onClose,
+  onViewPost,
 }: {
-  focusTarget: MapPoint | null
-  focusRequest: number
+  marker: MapMarkerData;
+  isHunter: boolean;
+  onClose: () => void;
+  onViewPost: (id: number) => void;
 }) {
-  const map = useMap()
+  const map = useMap();
+  const [pos, setPos] = useState(() =>
+    map.latLngToContainerPoint([marker.latitude, marker.longitude])
+  );
 
-  useEffect(() => {
-    if (!focusTarget || focusRequest === 0) return
-
-    map.flyTo([focusTarget.lat, focusTarget.lng], Math.max(map.getZoom(), 15))
-  }, [focusRequest, focusTarget, map])
-
-  return null
-}
-
-function PostOverlayMarker({
-  post,
-  isVisible,
-  onOverlayClick,
-}: {
-  post: MutantHuntingRequest
-  isVisible: boolean
-  onOverlayClick: () => void
-}) {
-  const map = useMap()
-  const [position, setPosition] = useState(() =>
-    map.latLngToContainerPoint([post.latitude, post.longitude])
-  )
-
-  function updatePosition() {
-    setPosition(map.latLngToContainerPoint([post.latitude, post.longitude]))
+  // อัพเดทตำแหน่ง overlay ตามเมื่อ map ขยับ/ซูม
+  function update() {
+    setPos(map.latLngToContainerPoint([marker.latitude, marker.longitude]));
   }
 
   useEffect(() => {
-    updatePosition()
-  }, [post.latitude, post.longitude])
+    update();
+  }, [marker.latitude, marker.longitude]);
 
-  useMapEvents({
-    move: updatePosition,
-    resize: updatePosition,
-    zoom: updatePosition,
-  })
+  useMapEvents({ move: update, zoom: update, resize: update });
+
+  const fallbackImage =
+    "https://images.unsplash.com/photo-1546182990-dffeafbe841d?w=400";
+  const image = marker.picture || fallbackImage;
+  const title = `${marker.mutantType} ${marker.animalType}`;
 
   return (
+    // ใช้ pointer-events-none บน container หลักเพื่อไม่ให้บัง map
+    // แต่ pointer-events-auto บน card เพื่อให้กดได้
     <div
-      className={
-        isVisible
-          ? "pointer-events-auto absolute z-[500] -translate-x-1/2 -translate-y-[calc(100%+34px)] opacity-100 transition-opacity duration-200"
-          : "pointer-events-none absolute z-[500] -translate-x-1/2 -translate-y-[calc(100%+34px)] opacity-0 transition-opacity duration-200"
-      }
-      style={{ left: position.x, top: position.y }}
+      className="pointer-events-none absolute z-[500]"
+      style={{
+        left: pos.x,
+        top: pos.y,
+        transform: "translate(-50%, calc(-100% - 20px))",
+      }}
     >
-      <PostPinOverlay
-        mode="preview"
-        image={post.picture ?? post.imageUrl ?? null}
-        title={getPostTitle(post)}
-        onViewPost={(event) => {
-          event.stopPropagation()
-          onOverlayClick()
+      {/* Card ── ใช้ design เดียวกับ PostPinOverlay ของเพื่อน */}
+      <div className="pointer-events-auto w-52 rounded-xl border border-[#2d3748] bg-[#0f1115] p-3 text-[#e5e7eb] shadow-[0_0_18px_rgba(57,255,20,0.25)] transition-all duration-200 hover:border-[#39ff14]">
+        
+        {/* ปุ่มปิด */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose();
+          }}
+          className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-[#1a1f2e] text-xs text-[#9ca3af] hover:text-white"
+        >
+          ✕
+        </button>
+
+        {/* รูปภาพ */}
+        <img
+          src={image}
+          alt={title}
+          className="h-28 w-full rounded-lg object-cover"
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = fallbackImage;
+          }}
+        />
+
+        {/* ชื่อ mutant ── เขียวเรือง เหมือน design เดิม */}
+        <h2 className="mt-3 text-center text-lg font-bold text-[#39ff14]">
+          {title}
+        </h2>
+
+        {/* รายละเอียด */}
+        <div className="mt-2 space-y-1 text-xs">
+          <p>
+            <span className="text-[#9ca3af]">Class: </span>
+            <span className="text-[#e5e7eb]">{marker.classRequired}</span>
+          </p>
+          {marker.reward && (
+            <p className="font-semibold text-[#39ff14]">
+              Reward: {marker.reward}
+            </p>
+          )}
+          {marker.description && (
+            <p className="line-clamp-2 text-[#9ca3af]">{marker.description}</p>
+          )}
+        </div>
+
+        {/* ปุ่ม Hunt! โชว์เฉพาะ Hunter */}
+        {isHunter && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onViewPost(marker.id);
+            }}
+            className="mt-3 w-full rounded bg-red-600 py-1 text-sm font-bold text-white transition hover:bg-red-700"
+          >
+            Hunt!
+          </button>
+        )}
+      </div>
+
+      {/* Arrow ชี้ลงหา marker */}
+      <div
+        className="mx-auto h-0 w-0"
+        style={{
+          borderLeft: "8px solid transparent",
+          borderRight: "8px solid transparent",
+          borderTop: "8px solid #2d3748",
         }}
       />
     </div>
-  )
+  );
 }
 
-export default function HunterMap({ role = "hunter" }: HunterMapProps) {
-  const location = useLocation()
-  const [posts, setPosts] = useState<MutantHuntingRequest[]>([])
-  const [selectedPost, setSelectedPost] = useState<MutantHuntingRequest | null>(null)
-  const [showMiniOverlay, setShowMiniOverlay] = useState(false)
-  const [showDetails, setShowDetails] = useState(false)
-  const [userLocation, setUserLocation] = useState<MapPoint>(BANGKOK_LOCATION)
-  const [focusRequest, setFocusRequest] = useState(0)
-  const [focusTarget, setFocusTarget] = useState<MapPoint | null>(null)
-  const [isDeleting, setIsDeleting] = useState(false)
-  const [notification, setNotification] = useState<string | null>(null)
+// ─── Click-outside handler ────────────────────────────────────────────────────
+function MapClickHandler({ onMapClick }: { onMapClick: () => void }) {
+  useMapEvents({
+    click() {
+      onMapClick();
+    },
+  });
+  return null;
+}
 
-  const selectedPostDistance = useMemo(() => {
-    if (!selectedPost) return "0.0 km"
+// ─── Main Component ───────────────────────────────────────────────────────────
+export default function HunterMap({ isHunter = false }: HunterMapProps) {
+  const defaultCenter: [number, number] = [13.7563, 100.5018]; // กรุงเทพฯ
+  const [markers, setMarkers] = useState<MapMarkerData[]>([]);
+  const [selectedMarker, setSelectedMarker] = useState<MapMarkerData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-    return `${calculateDistanceKm(userLocation, {
-      lat: selectedPost.latitude,
-      lng: selectedPost.longitude,
-    }).toFixed(1)} km`
-  }, [selectedPost, userLocation])
-
-  const loadPosts = useCallback(() => {
-    getMutantHuntingRequests()
-      .then((requests) => {
-        setPosts(requests.filter((request) => request.status === "PUBLIC"))
-      })
-      .catch(console.error)
-  }, [])
-
+  // ดึงข้อมูล markers จาก Backend และ poll ทุก 3 วินาที
   useEffect(() => {
-    loadPosts()
-  }, [loadPosts, location.key])
+    let isFirstFetch = true;
 
-  useEffect(() => {
-    const state = location.state as { notification?: string } | null
-    if (!state?.notification) return
+    const fetchMarkers = async () => {
+      try {
+        // แสดง loading spinner เฉพาะครั้งแรก ครั้งถัดไป update เงียบๆ
+        if (isFirstFetch) setLoading(true);
+        const data = await getMapMarkers();
+        setMarkers(data);
+        setError(null);
+      } catch (err) {
+        console.error("Error fetching map markers:", err);
+        // แสดง error เฉพาะครั้งแรก ไม่ให้ทำลาย UX ระหว่าง poll
+        if (isFirstFetch) setError("ไม่สามารถโหลดข้อมูล Post บน Map ได้");
+      } finally {
+        if (isFirstFetch) {
+          setLoading(false);
+          isFirstFetch = false;
+        }
+      }
+    };
 
-    setNotification(state.notification)
-    const timeoutId = window.setTimeout(() => {
-      setNotification(null)
-    }, 2500)
+    fetchMarkers();
+    const interval = setInterval(fetchMarkers, 3000);
 
-    return () => {
-      window.clearTimeout(timeoutId)
-    }
-  }, [location.state])
+    // cleanup เมื่อ component unmount
+    return () => clearInterval(interval);
+  }, []);
 
-  useEffect(() => {
-    window.addEventListener("focus", loadPosts)
-    window.addEventListener("mutant-hunting-request-created", loadPosts)
-    const intervalId = window.setInterval(loadPosts, 15000)
-
-    return () => {
-      window.removeEventListener("focus", loadPosts)
-      window.removeEventListener("mutant-hunting-request-created", loadPosts)
-      window.clearInterval(intervalId)
-    }
-  }, [loadPosts])
-
-  useEffect(() => {
-    if (!navigator.geolocation) {
-      setUserLocation(BANGKOK_LOCATION)
-      return
-    }
-
-    const watchId = navigator.geolocation.watchPosition(
-      (position) => {
-        setUserLocation({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-        })
-      },
-      () => {
-        setUserLocation(BANGKOK_LOCATION)
-      },
-    )
-
-    return () => {
-      navigator.geolocation.clearWatch(watchId)
-    }
-  }, [])
-
-  function handleMapSpaceClick() {
-    setShowMiniOverlay(false)
-    setShowDetails(false)
-  }
-
-  function handlePostMarkerClick(post: MutantHuntingRequest) {
-    setSelectedPost(post)
-    setShowMiniOverlay(true)
-    setShowDetails(true)
-  }
-
-  function handleViewMap() {
-    if (!selectedPost) return
-
-    setFocusTarget({
-      lat: selectedPost.latitude,
-      lng: selectedPost.longitude,
-    })
-    setFocusRequest((current) => current + 1)
-  }
-
-  async function handleDeleteSelectedPost() {
-    if (!selectedPost || isDeleting) return
-
-    setIsDeleting(true)
-
-    try {
-      await deleteMutantHuntingRequest(selectedPost.id, selectedPost.userId)
-      setPosts((currentPosts) =>
-        currentPosts.filter((post) => post.id !== selectedPost.id)
-      )
-      setSelectedPost(null)
-      setShowMiniOverlay(false)
-      setShowDetails(false)
-      setNotification("Post deleted successfully")
-      setTimeout(() => {
-        setNotification(null)
-      }, 2000)
-    } catch (error) {
-      console.error(error)
-    } finally {
-      setIsDeleting(false)
-    }
-  }
+  // นำ Hunter ไปหน้า HuntRoomDetails เมื่อกด Hunt!
+  const handleViewPost = (postId: number) => {
+    window.location.href = `/hunter/hunt-room/${postId}`;
+  };
 
   return (
-    <div className="flex h-full w-full flex-col bg-[#050505] text-[#e5e7eb] md:flex-row">
-      {notification && (
-        <div className="fixed left-1/2 top-5 z-[1000] -translate-x-1/2 rounded border border-[#39ff14] bg-[#0f1115] px-5 py-3 text-sm text-[#39ff14] shadow-[0_0_14px_rgba(57,255,20,0.35)]">
-          {notification}
+    <div className="relative w-full h-full">
+      {/* Loading state */}
+      {loading && (
+        <div className="absolute inset-0 z-[999] flex items-center justify-center bg-[#050505]/80">
+          <p className="font-mono text-sm text-[#39ff14] animate-pulse">
+            [ LOADING MAP DATA... ]
+          </p>
         </div>
       )}
 
-      <div className={showDetails ? "h-[42vh] w-full md:h-full md:w-[60%]" : "h-full w-full"}>
-        <MapContainer
-          center={defaultCenter}
-          zoom={13}
-          scrollWheelZoom
-          zoomControl
-          attributionControl={false}
-          className="h-full w-full"
-        >
-          <SelectedPostMapController
-            focusTarget={focusTarget}
-            focusRequest={focusRequest}
-          />
-          <MapClickCloser onClose={handleMapSpaceClick} />
-
-          <TileLayer
-            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-            attribution='&copy; <a href="https://carto.com/">CARTO</a>'
-          />
-
-          <Marker position={[userLocation.lat, userLocation.lng]} icon={userLocationIcon}>
-            <Tooltip direction="top" offset={[0, -8]}>
-              Your location
-            </Tooltip>
-          </Marker>
-
-          {posts.map((post) => (
-            <Marker
-              key={post.id}
-              position={[post.latitude, post.longitude]}
-              icon={mutantIcon}
-              eventHandlers={{
-                click(event) {
-                  event.originalEvent.stopPropagation()
-                  handlePostMarkerClick(post)
-                },
-              }}
-            >
-              <Tooltip direction="top" offset={[0, -8]}>
-                {getPostTitle(post)}
-              </Tooltip>
-            </Marker>
-          ))}
-
-          {selectedPost && (
-            <PostOverlayMarker
-              post={selectedPost}
-              isVisible={showMiniOverlay}
-              onOverlayClick={() => {
-                setShowMiniOverlay(true)
-                setShowDetails(true)
-              }}
-            />
-          )}
-        </MapContainer>
-      </div>
-
-      {showDetails && selectedPost && (
-        <section className="h-[58vh] w-full animate-[fadeInRight_0.25s_ease-out] overflow-y-auto bg-[#0f1115] px-5 py-5 md:h-full md:w-[40%] md:px-10 md:py-6">
-          {role === "user" ? (
-            <UserPostDetails
-              post={selectedPost}
-              distance={selectedPostDistance}
-              onViewMap={handleViewMap}
-              onDelete={handleDeleteSelectedPost}
-            />
-          ) : (
-            <HunterPostDetails
-              post={selectedPost}
-              distance={selectedPostDistance}
-              onViewMap={handleViewMap}
-            />
-          )}
-        </section>
+      {/* Error state */}
+      {error && (
+        <div className="absolute top-4 left-1/2 z-[999] -translate-x-1/2 rounded border border-red-600/50 bg-[#0f1115] px-4 py-2 text-sm text-red-400">
+          {error}
+        </div>
       )}
+
+      <MapContainer
+        center={defaultCenter}
+        zoom={13}
+        style={{ height: "100%", width: "100%", zIndex: 0 }}
+        attributionControl={false}
+      >
+        {/* Dark map tile เหมือนกับที่เพื่อนใช้ใน RealMap.tsx */}
+        <TileLayer
+          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          attribution='&copy; <a href="https://carto.com/">CARTO</a>'
+        />
+
+        {/* ปิด overlay เมื่อ click บน map */}
+        <MapClickHandler onMapClick={() => setSelectedMarker(null)} />
+
+        {/* วาง Marker บน map ทุก Post ที่ status=OPEN */}
+        {markers.map((marker) => (
+          <Marker
+            key={marker.id}
+            position={[marker.latitude, marker.longitude]}
+            icon={mutantIcon}
+            eventHandlers={{
+              click: (e) => {
+                // หยุด event ไม่ให้ไปถึง MapClickHandler
+                e.originalEvent.stopPropagation();
+                setSelectedMarker(
+                  selectedMarker?.id === marker.id ? null : marker
+                );
+              },
+            }}
+          />
+        ))}
+
+        {/* Overlay popup แบบ custom ── แสดงเมื่อ marker ถูกเลือก */}
+        {selectedMarker && (
+          <PostOverlay
+            marker={selectedMarker}
+            isHunter={isHunter}
+            onClose={() => setSelectedMarker(null)}
+            onViewPost={handleViewPost}
+          />
+        )}
+      </MapContainer>
     </div>
-  )
+  );
 }

@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import morgan from "morgan"
 import authRouter from "./routes/auth.route.js";
 import mutantHuntingRequestRouter from "./modules/MutantHuntingRequestSystem/routes/MutantHuntingRequestSystem.routes.js";
+import mapRoutes from "./routes/map.routes.js";
 
 dotenv.config();
 
@@ -16,6 +17,7 @@ app.use(morgan("dev"))
 
 app.use("/api/auth", authRouter);
 app.use("/api", mutantHuntingRequestRouter);
+app.use("/api/map", mapRoutes);
 
 app.get("/", (req, res) => {
   res.send("Ready");
