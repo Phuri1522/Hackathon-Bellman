@@ -2,16 +2,30 @@ import SelectInput from "./SelectInput";
 import ImageUploadBox from "./ImageUploadBox";
 import CancelButton from "./CancelButton";
 import SubmitSightingButton from "./SubmitSightingButton";
+import { useState } from "react";
 
 import {
     ANIMAL_TYPES,
     MUTANT_TYPES,
-    HUNTER_CLASSES,
 } from "../types/mutantHunting.type";
 
 export default function CreatePostForm() {
+    const [showSuccess, setShowSuccess] = useState(false);
+    function handleSubmit() {
+        setShowSuccess(true);
+
+        setTimeout(() => {
+            setShowSuccess(false);
+        }, 2500);
+    }
+
     return (
         <>
+            {showSuccess && (
+                <div className="fixed right-5 top-5 z-50 rounded border border-[#39ff14] bg-[#0f1115] px-5 py-3 text-sm text-[#39ff14] shadow-[0_0_14px_rgba(57,255,20,0.35)]">
+                    Post submitted successfully
+                </div>
+            )}
             <h1 className="text-2xl font-bold text-[#39ff14] md:text-4xl">
                 POST MUTANT SIGHTING
             </h1>
@@ -68,7 +82,7 @@ export default function CreatePostForm() {
 
             <div className="mt-4 flex gap-4">
                 <CancelButton />
-                <SubmitSightingButton />
+                <SubmitSightingButton onClick={handleSubmit} />
             </div>
         </>
     );
