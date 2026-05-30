@@ -5,11 +5,11 @@ generator client {
 
 datasource db {
   provider = "sqlite"
-  url      = env("DATABASE_URL")
 }
 
 model User {
   id          Int      @id @default(autoincrement())
+  avatarUrl      String?
   email       String   @unique
   name        String
   accountType String   @default("USER")
@@ -23,6 +23,7 @@ model Hunter {
   id                   Int      @id @default(autoincrement())
   userId               Int      @unique
   user                 User     @relation(fields: [userId], references: [id])
+  avatarUrl            String?
   gender               String
   age                  Int
   class                String
@@ -45,7 +46,7 @@ model Post {
   mutantType    String
   latitude      Float
   longitude     Float
-  picture       String
+  picture       String?
   description   String?
   classRequired String
   reward        String?
