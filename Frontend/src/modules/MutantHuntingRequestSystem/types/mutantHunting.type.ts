@@ -38,6 +38,12 @@ export type CreateMutantHuntingRequestPayload = {
   longitude: number;
 };
 
+export type MutantHuntingRequestStatus =
+  | "MATCHMAKING"
+  | "PUBLIC"
+  | "ACCEPTED"
+  | "COMPLETED";
+
 export type MapPoint = {
   lat: number;
   lng: number;
@@ -49,4 +55,20 @@ export type MutantPostPreview = {
   mutantType: string;
   reward: string;
   requiredClasses: string[];
+};
+
+export type MutantHuntingRequest = {
+  id: number;
+  userId: number;
+  animalType: string;
+  mutantType: string;
+  latitude: number;
+  longitude: number;
+  picture?: string | null;
+  imageUrl?: string | null;
+  description?: string | null;
+  classRequired: string;
+  reward?: string | null;
+  status: MutantHuntingRequestStatus;
+  createdAt?: string;
 };
