@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import authRouter from "./routes/auth.route.js";
 import hunterRouter from "./modules/hunt-matching/routers/hunter.route.js";
 import huntRequestRouter from "./modules/hunt-matching/routers/huntRequest.route.js";
+import userRouter from "./modules/hunt-matching/routers/user.route.js"
 
 dotenv.config();
 
@@ -16,7 +17,7 @@ app.use(express.json());
 app.use("/api/auth", authRouter);
 app.use("/api/hunters", hunterRouter);
 app.use("/api/hunt-requests", huntRequestRouter);
-
+app.use("/api/users", userRouter)
 app.get("/", (req, res) => {
   res.send("Ready");
 });
