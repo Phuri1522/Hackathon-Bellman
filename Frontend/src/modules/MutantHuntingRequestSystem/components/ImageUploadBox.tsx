@@ -1,15 +1,26 @@
 import { useState } from "react";
+import type { ChangeEvent } from "react";
 
-export default function ImageUploadBox() {
-  const [preview, setPreview] = useState<string | null>(null);
+type ImageUploadBoxProps = {
+  preview?: string | null;
+  onImageChange?: (imageUrl: string) => void;
+};
 
-  function handleImageChange(event: React.ChangeEvent<HTMLInputElement>) {
+export default function ImageUploadBox({
+  preview: controlledPreview,
+  onImageChange,
+}: ImageUploadBoxProps) {
+  const [localPreview, setLocalPreview] = useState<string | null>(null);
+  const preview = controlledPreview ?? localPreview;
+
+  function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
 
     if (!file) return;
 
     const imageUrl = URL.createObjectURL(file);
-    setPreview(imageUrl);
+    setLocalPreview(imageUrl);
+    onImageChange?.(imageUrl);
   }
 
   return (
