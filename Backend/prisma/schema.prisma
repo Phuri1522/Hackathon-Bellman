@@ -1,5 +1,5 @@
 generator client {
-  provider        = "prisma-client-js"
+  provider = "prisma-client-js"
   output   = "../generated/prisma"
 }
 
@@ -8,10 +8,81 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  name      String?
+  id          Int      @id @default(autoincrement())
+  avatarUrl      String?
+  email       String   @unique
+  name        String
+  accountType String   @default("USER")
+  createdAt   DateTime @default(now())
+
+  hunter Hunter?
+  posts  Post[]
+}
+
+model Hunter {
+  id                   Int      @id @default(autoincrement())
+  userId               Int      @unique
+  user                 User     @relation(fields: [userId], references: [id])
+  avatarUrl            String?
+  gender               String
+  age                  Int
+  class                String
+  rank                 String   @default("D")
+  rankScore            Float    @default(0)
+  autoMatch            Boolean  @default(false)
+  autoMatchPreferences String?
+  currentLat           Float?
+  currentLng           Float?
+
+  huntRequests HuntRequest[]
+  locations    Location[]
+}
+
+model Post {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  user          User     @relation(fields: [userId], references: [id])
+  animalType    String
+  mutantType    String
+  latitude      Float
+  longitude     Float
+  picture       String?
+  description   String?
+  classRequired String
+  reward        String?
+  status        String   @default("OPEN")
+  createdAt     DateTime @default(now())
+
+  huntRequests HuntRequest[]
+  sighting     MutantSighting?
+}
+
+model HuntRequest {
+  id            Int      @id @default(autoincrement())
+  postId        Int
+  post          Post     @relation(fields: [postId], references: [id])
+  hunterId      Int
+  hunter        Hunter   @relation(fields: [hunterId], references: [id])
+  status        String   @default("PENDING")
+  isAutoMatched Boolean  @default(false)
+  createdAt     DateTime @default(now())
+}
+
+model MutantSighting {
+  id        Int      @id @default(autoincrement())
+  postId    Int      @unique
+  post      Post     @relation(fields: [postId], references: [id])
+  latitude  Float
+  longitude Float
+  isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+}
+
+model Location {
+  id         Int      @id @default(autoincrement())
+  hunterId   Int
+  hunter     Hunter   @relation(fields: [hunterId], references: [id])
+  latitude   Float
+  longitude  Float
+  recordedAt DateTime @default(now())
 }
