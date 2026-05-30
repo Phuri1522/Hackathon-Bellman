@@ -6,7 +6,6 @@ import hunterRouter from "./modules/hunt-matching/routers/hunter.route.js";
 import huntRequestRouter from "./modules/hunt-matching/routers/huntRequest.route.js";
 import userRouter from "./modules/hunt-matching/routers/user.route.js"
 import mutantHuntingRequestRouter from "./modules/MutantHuntingRequestSystem/routes/MutantHuntingRequestSystem.routes.js";
-import authRouter from "./routes/auth.route.js"; // ดึงไฟล์เราเตอร์มา
 
 dotenv.config();
 

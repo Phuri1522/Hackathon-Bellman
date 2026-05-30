@@ -1,5 +1,4 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { Routes, Route, Navigate } from "react-router-dom";
 // import ProtectedRoute from "../components/ProtectedRoute";
 
 import LoginPage from "../pages/SignIn";
@@ -13,7 +12,6 @@ import HuntRoomDetails from "../modules/MutantHuntingRequestSystem/pages/HuntRoo
 
 export default function AppRouter() {
   return (
-    <BrowserRouter>
       <Routes>
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<LoginPage />} />
@@ -26,6 +24,5 @@ export default function AppRouter() {
         <Route path="/user/create-post" element={<CreatePost />}/>
         <Route path="/user/hunt-details"element={<HuntRoomDetails />}/>
       </Routes>
-    </BrowserRouter>
   );
 }
