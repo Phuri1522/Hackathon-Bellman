@@ -8,10 +8,13 @@ import {
 } from "../models/MutantHuntingRequestSystem.models.js";
 
 const VALID_STATUSES: MutantHuntingRequestStatus[] = [
-  "OPEN",
+  "MATCHMAKING",
+  "PUBLIC",
   "ACCEPTED",
   "COMPLETED",
 ];
+
+const MATCHMAKING_TIMEOUT_MS = 60 * 1000;
 
 const normalizeType = (value: string): string => value.trim().toLowerCase();
 
@@ -98,7 +101,7 @@ export const createMutantHuntingRequest = async (
     const latitude = toNumber(body.latitude);
     const longitude = toNumber(body.longitude);
     const imageUrl = body.imageUrl ?? body.image;
-    const status = body.status ?? "OPEN";
+    const status: MutantHuntingRequestStatus = "MATCHMAKING";
 
     if (!userId) {
       res.status(400).json({ message: "userId is required" });
@@ -160,6 +163,21 @@ export const getAllMutantHuntingRequests = async (
   res: Response
 ): Promise<void> => {
   try {
+    const matchmakingExpiresAt = new Date(Date.now() - MATCHMAKING_TIMEOUT_MS);
+
+    await prisma.post.updateMany({
+      where: { status: "OPEN" },
+      data: { status: "PUBLIC" },
+    });
+
+    await prisma.post.updateMany({
+      where: {
+        status: "MATCHMAKING",
+        createdAt: { lte: matchmakingExpiresAt },
+      },
+      data: { status: "PUBLIC" },
+    });
+
     const requests = await prisma.post.findMany({
       orderBy: { createdAt: "desc" },
       include: {
@@ -319,7 +337,7 @@ export const acceptMutantHuntingRequest = async (
       return;
     }
 
-    if (request.status !== "OPEN") {
+    if (request.status === "ACCEPTED" || request.status === "COMPLETED") {
       res.status(400).json({
         message:
           "This mutant hunting request has already been accepted, is in progress, or is completed",
@@ -329,7 +347,7 @@ export const acceptMutantHuntingRequest = async (
 
     const result = await prisma.$transaction(async (tx: any) => {
       const updated = await tx.post.updateMany({
-        where: { id, status: "OPEN" },
+        where: { id, status: { in: ["MATCHMAKING", "PUBLIC"] } },
         data: { status: "ACCEPTED" },
       });
 

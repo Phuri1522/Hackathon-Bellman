@@ -175,7 +175,9 @@ export default function HunterMap({ role = "hunter" }: HunterMapProps) {
 
   const loadPosts = useCallback(() => {
     getMutantHuntingRequests()
-      .then(setPosts)
+      .then((requests) => {
+        setPosts(requests.filter((request) => request.status === "PUBLIC"))
+      })
       .catch(console.error)
   }, [])
 
@@ -184,12 +186,28 @@ export default function HunterMap({ role = "hunter" }: HunterMapProps) {
   }, [loadPosts, location.key])
 
   useEffect(() => {
+    const state = location.state as { notification?: string } | null
+    if (!state?.notification) return
+
+    setNotification(state.notification)
+    const timeoutId = window.setTimeout(() => {
+      setNotification(null)
+    }, 2500)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [location.state])
+
+  useEffect(() => {
     window.addEventListener("focus", loadPosts)
     window.addEventListener("mutant-hunting-request-created", loadPosts)
+    const intervalId = window.setInterval(loadPosts, 15000)
 
     return () => {
       window.removeEventListener("focus", loadPosts)
       window.removeEventListener("mutant-hunting-request-created", loadPosts)
+      window.clearInterval(intervalId)
     }
   }, [loadPosts])
 

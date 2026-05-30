@@ -125,7 +125,10 @@ export default function CreatePostForm({
             window.dispatchEvent(new Event("mutant-hunting-request-created"));
 
             navigate("/home", {
-                state: { mutantHuntingRefreshAt: Date.now() },
+                state: {
+                    mutantHuntingRefreshAt: Date.now(),
+                    notification: "Searching for nearby hunters...",
+                },
             });
         } catch {
             setErrorMessage("Failed to submit post");
