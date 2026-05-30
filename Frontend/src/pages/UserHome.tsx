@@ -81,7 +81,7 @@ export default function UserHome() {
         mobileTab === 'MY_POSTS' ? 'h-[60vh]' : 'h-[80px]'
       }`}>
         
-        {/* ขีดลากด้านบน (Visual Design) */}
+        {/* Visual Design */}
         <div 
           className="w-full flex justify-center py-3 cursor-pointer"
           onClick={() => setMobileTab(mobileTab === 'MY_POSTS' ? 'MAP' : 'MY_POSTS')}
