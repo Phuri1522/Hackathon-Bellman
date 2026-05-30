@@ -125,7 +125,7 @@ export default function UserSidebar({ user, posts, onCreatePost }: Props) {
               className="hidden md:flex items-center justify-center border border-[#b7410e] text-[#b7410e] rounded px-3 py-2 text-xs hover:bg-[#b7410e15] transition-colors flex-shrink-0"
               style={{ fontFamily: "Orbitron, monospace" }}
             >
-              OUT
+              LOGOUT
             </button>
           </div>
         </div>
