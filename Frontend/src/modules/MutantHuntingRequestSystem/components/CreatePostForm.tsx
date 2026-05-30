@@ -38,7 +38,7 @@ export default function CreatePostForm() {
                 <SelectInput label="Mutant Type" options={MUTANT_TYPES} />
             </div>
 
-            <div className="mb-2">
+            <div className="mb-4">
                 <div className="mb-2">
                     <label className="mb-2 block text-xs text-[#e5e7eb]">
                         Required Class
@@ -51,8 +51,6 @@ export default function CreatePostForm() {
                     />
                 </div>
             </div>
-
-            <ImageUploadBox />
 
             <div className="mb-3">
                 <label className="mb-2 block text-xs text-[#e5e7eb]">Reward</label>
@@ -72,6 +70,8 @@ export default function CreatePostForm() {
                     placeholder="Optional notes..."
                 />
             </div>
+
+            <ImageUploadBox />
 
             <p className="mb-6 text-sm text-[#e5e7eb]">
                 Distance (auto):{" "}

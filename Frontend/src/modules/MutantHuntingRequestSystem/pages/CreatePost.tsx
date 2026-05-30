@@ -8,7 +8,9 @@ export default function CreatePostPage() {
   return (
     <main className="h-screen overflow-hidden bg-[#050505] text-[#e5e7eb]">
       <div className="relative flex h-full flex-col md:flex-row">
-        <LocationPicker showOverlay={showOverlay} onPinClick={() => setShowOverlay(true)} />
+        <div className="h-[42vh] w-full md:h-full md:w-[60%]">
+          <LocationPicker showOverlay={showOverlay} onPinClick={() => setShowOverlay(true)} />
+        </div>
         <section className="h-[58vh] w-full overflow-y-auto bg-[#0f1115] px-5 py-5 md:h-full md:w-[40%] md:px-10 md:py-6">
           <CreatePostForm />
         </section>
