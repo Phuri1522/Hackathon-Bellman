@@ -24,14 +24,12 @@ model Hunter {
   id                   Int      @id @default(autoincrement())
   userId               Int      @unique
   user                 User     @relation(fields: [userId], references: [id])
-  avatarUrl            String?
   gender               String
   age                  Int
   class                String
   rank                 String   @default("D")
   rankScore            Float    @default(0)
   autoMatch            Boolean  @default(false)
-  autoMatchPreferences String?
   currentLat           Float?
   currentLng           Float?
 
