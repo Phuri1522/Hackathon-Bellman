@@ -1,6 +1,6 @@
 export default function LocationPicker() {
   return (
-    <section className="relative min-h-screen flex-1 overflow-hidden bg-[#06140b] border border-[#39ff14]/40">
+    <section className="relative h-[42vh] w-full overflow-hidden border border-[#39ff14]/40 bg-[#06140b] md:h-full md:w-[60%]">
       {/* grid */}
       <div
         className="absolute inset-0 opacity-30"
