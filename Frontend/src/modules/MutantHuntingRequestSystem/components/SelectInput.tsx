@@ -20,7 +20,7 @@ export default function SelectInput({
       <select
         value={value}
         onChange={(event) => onChange?.(event.target.value)}
-        className="w-full rounded border border-[#2d3748] bg-[#050505] p-3 text-white"
+        className="w-full rounded border border-[#2d3748] bg-[#050505] p-3 pr-12 text-white"
       >
         {options.map((option) => (
           <option key={option}>{option}</option>

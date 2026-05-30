@@ -100,8 +100,8 @@ export default function CreatePostPage() {
 
   return (
     <main className="h-screen overflow-hidden bg-[#050505] text-[#e5e7eb]">
-      <div className="relative flex h-full flex-col md:flex-row">
-        <div className="h-[42vh] w-full md:h-full md:w-[60%]">
+      <div className="relative flex h-full min-w-0 flex-col overflow-x-hidden md:flex-row">
+        <div className="h-[42vh] min-h-[260px] w-full min-w-0 md:h-full md:min-h-0 md:w-[60%]">
           <LocationPicker
             userLocation={userLocation}
             selectedPin={selectedPin}
@@ -114,7 +114,7 @@ export default function CreatePostPage() {
             markerLabel="Mutant sighting"
           />
         </div>
-        <section className="h-[58vh] w-full overflow-y-auto bg-[#0f1115] px-5 py-5 md:h-full md:w-[40%] md:px-10 md:py-6">
+        <section className="h-[58vh] w-full min-w-0 overflow-y-auto overflow-x-hidden bg-[#0f1115] px-5 py-5 md:h-full md:w-[40%] md:px-10 md:py-6">
           {showDetails ? (
             role === "user" ? <UserPostDetails /> : <HunterPostDetails />
           ) : (

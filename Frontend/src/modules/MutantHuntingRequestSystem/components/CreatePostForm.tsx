@@ -130,7 +130,8 @@ export default function CreatePostForm({
                     notification: "Searching for nearby hunters...",
                 },
             });
-        } catch {
+        } catch (error) {
+            console.error("Failed to submit mutant hunting request", error);
             setErrorMessage("Failed to submit post");
             setShowError(true);
 
@@ -233,7 +234,7 @@ export default function CreatePostForm({
                 </span>
             </p>
 
-            <div className="mt-4 flex gap-4">
+            <div className="mt-4 flex flex-wrap gap-4">
                 <CancelButton />
                 <SubmitSightingButton onClick={handleSubmit} disabled={isSubmitting} />
             </div>

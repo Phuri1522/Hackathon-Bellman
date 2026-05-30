@@ -17,7 +17,10 @@ export async function createMutantHuntingRequest(
   });
 
   if (!response.ok) {
-    throw new Error("Failed to create mutant hunting request");
+    const errorText = await response.text();
+    throw new Error(
+      `Failed to create mutant hunting request (${response.status}): ${errorText}`
+    );
   }
 
   return response.json();

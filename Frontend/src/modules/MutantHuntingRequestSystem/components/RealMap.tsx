@@ -71,12 +71,19 @@ function PreviewOverlayMarker({
   isVisible: boolean;
 }) {
   const map = useMap();
-  const [position, setPosition] = useState(() =>
-    map.latLngToContainerPoint([selectedPin.lat, selectedPin.lng])
-  );
+  const [position, setPosition] = useState<{ x: number; y: number }>(() => {
+    const point = map.latLngToContainerPoint([selectedPin.lat, selectedPin.lng]);
+    return { x: point.x, y: point.y };
+  });
 
   function updatePosition() {
-    setPosition(map.latLngToContainerPoint([selectedPin.lat, selectedPin.lng]));
+    const point = map.latLngToContainerPoint([selectedPin.lat, selectedPin.lng]);
+    const size = map.getSize();
+
+    setPosition({
+      x: Math.min(Math.max(point.x, 112), Math.max(size.x - 112, 112)),
+      y: Math.max(point.y, 150),
+    });
   }
 
   useEffect(() => {

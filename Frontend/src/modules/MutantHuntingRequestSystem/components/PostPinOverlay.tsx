@@ -28,7 +28,7 @@ export default function PostPinOverlay({
         e.stopPropagation();
         onViewPost?.(e);
       }}
-      className="w-52 rounded-xl border border-[#2d3748] bg-[#0f1115] p-3 text-[#e5e7eb] shadow-[0_0_18px_rgba(57,255,20,0.25)] transition-all duration-200 hover:border-[#39ff14]"
+      className="w-52 max-w-[calc(100vw-2rem)] rounded-xl border border-[#2d3748] bg-[#0f1115] p-3 text-[#e5e7eb] shadow-[0_0_18px_rgba(57,255,20,0.25)] transition-all duration-200 hover:border-[#39ff14]"
     >
       <img
         src={overlayImage}
