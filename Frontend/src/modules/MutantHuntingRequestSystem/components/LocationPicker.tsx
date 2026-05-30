@@ -1,0 +1,29 @@
+export default function LocationPicker() {
+  return (
+    <section className="relative min-h-screen flex-1 overflow-hidden bg-[#06140b] border border-[#39ff14]/40">
+      {/* grid */}
+      <div
+        className="absolute inset-0 opacity-30"
+        style={{
+          backgroundImage:
+            "linear-gradient(#39ff14 1px, transparent 1px), linear-gradient(90deg, #39ff14 1px, transparent 1px)",
+          backgroundSize: "180px 180px",
+        }}
+      />
+
+      {/* dark overlay */}
+      <div className="absolute inset-0 bg-[#050505]/40" />
+
+      {/* center pin */}
+      <div className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 text-center">
+        <div className="mx-auto mb-2 h-4 w-4 rounded-full bg-[#39ff14] shadow-[0_0_18px_#39ff14]" />
+        <p className="font-mono text-xs text-[#39ff14]">
+          [ TACTICAL MAP VIEW ]
+        </p>
+        <p className="mt-1 font-mono text-[10px] text-[#39ff14]">
+          YOUR LOCATION
+        </p>
+      </div>
+    </section>
+  );
+}
