@@ -333,7 +333,7 @@ export default function Home() {
       .catch(console.error)
   }, [loadHunterProfile, loadHunterSummary, user])
 
-  useEffect(() => {
+  const loadUserPosts = useCallback(() => {
     if (!user || isHunter) return
 
     api.get(`/api/mutant-hunting-requests`)
@@ -351,6 +351,10 @@ export default function Home() {
       })
       .catch(console.error)
   }, [isHunter, user])
+
+  useEffect(() => {
+    loadUserPosts()
+  }, [loadUserPosts])
 
   useEffect(() => {
     if (!isHunter || !user?.hunter) return
@@ -378,13 +382,12 @@ export default function Home() {
 
     const intervalId = window.setInterval(() => {
       loadHunterSummary(user.hunter!.id)
-      loadHunterProfile(user.hunter!.id)
-    }, 3000)
+    }, 15000)
 
     return () => {
       window.clearInterval(intervalId)
     }
-  }, [isHunter, loadHunterProfile, loadHunterSummary, user])
+  }, [isHunter, loadHunterSummary, user])
 
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -423,7 +426,7 @@ export default function Home() {
           hunterId={user.hunter?.id}
           hasActiveTask={hasActiveTask}
           onRequestsChanged={
-            user.hunter ? () => loadHunterSummary(user.hunter!.id) : undefined
+            user.hunter ? () => loadHunterSummary(user.hunter!.id) : loadUserPosts
           }
         />
       }

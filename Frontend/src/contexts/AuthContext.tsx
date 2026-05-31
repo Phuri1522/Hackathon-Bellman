@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from "react"
+import { createContext, useContext, useState } from "react"
 
 interface Hunter {
   id: number
@@ -29,19 +29,21 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null)
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-  const [token, setToken] = useState<string | null>(null)
+function getStoredUser(): User | null {
+  const savedUser = localStorage.getItem("user")
+  if (!savedUser) return null
 
-  // load from localStorage on mount
-  useEffect(() => {
-    const savedToken = localStorage.getItem("token")
-    const savedUser = localStorage.getItem("user")
-    if (savedToken && savedUser) {
-      setToken(savedToken)
-      setUser(JSON.parse(savedUser))
-    }
-  }, [])
+  try {
+    return JSON.parse(savedUser) as User
+  } catch {
+    localStorage.removeItem("user")
+    return null
+  }
+}
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null>(() => getStoredUser())
+  const [token, setToken] = useState<string | null>(() => localStorage.getItem("token"))
 
   const login = (token: string, user: User) => {
     setToken(token)
@@ -63,7 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       token,
       login,
       logout,
-      isAuthenticated: !!token,
+      isAuthenticated: Boolean(token && user),
     }}>
       {children}
     </AuthContext.Provider>

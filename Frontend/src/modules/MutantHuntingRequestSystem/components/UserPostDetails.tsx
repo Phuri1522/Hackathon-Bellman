@@ -17,6 +17,7 @@ type PostDetailsProps = {
     distance?: string;
     onViewMap?: () => void;
     onDelete?: () => void;
+    canDelete?: boolean;
 };
 
 function displayValue(value: string | null | undefined, fallback = "-") {
@@ -41,6 +42,7 @@ export default function UserPostDetails({
     distance,
     onViewMap,
     onDelete,
+    canDelete = false,
 }: PostDetailsProps) {
     const details = {
         animalType: post?.animalType ?? POST_DETAILS.animalType,
@@ -91,7 +93,7 @@ export default function UserPostDetails({
 
             <div className="mt-4 flex gap-4">
                 <ViewPostButton label="View Map" onClick={onViewMap} />
-                <DeleteButton onClick={handleSubmit}/>
+                {canDelete && <DeleteButton onClick={handleSubmit}/>}
             </div>
         </>
     );

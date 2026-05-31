@@ -136,7 +136,7 @@ export default function RealMap({
       scrollWheelZoom
       zoomControl
       attributionControl={false}
-      className="h-full w-full"
+      className="relative z-0 h-full w-full"
     >
       <MapCenterUpdater center={userLocation} zoom={zoom} />
       <MapClickHandler onMapClick={onMapClick} />

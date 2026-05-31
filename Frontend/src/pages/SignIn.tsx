@@ -31,7 +31,7 @@ export default function SignIn() {
     try {
       const res = await authService.login(form.email, form.password)
       login(res.token, res.user)
-      navigate("/Home")
+      navigate("/home")
     } catch (err: any) {
       setFieldErrors({ submit: err.response?.data?.message ?? "Login failed" })
     } finally { setLoading(false) }

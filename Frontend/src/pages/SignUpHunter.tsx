@@ -58,7 +58,7 @@ export default function SignUpHunter() {
         gender: form.gender, age: Number(form.age), class: form.class,
       })
       login(res.token, res.user)
-      navigate("/Home")
+      navigate("/home")
     } catch (err: any) {
       setFieldErrors({ submit: err.response?.data?.message ?? "Registration failed" })
     } finally { setLoading(false) }

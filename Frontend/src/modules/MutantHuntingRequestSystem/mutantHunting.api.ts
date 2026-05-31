@@ -5,6 +5,10 @@ import type {
 
 const API_BASE_URL = "http://localhost:3000/api";
 
+type ApiError = Error & {
+  status?: number;
+};
+
 export async function createMutantHuntingRequest(
   payload: CreateMutantHuntingRequestPayload,
 ) {
@@ -54,7 +58,12 @@ export async function deleteMutantHuntingRequest(id: number, userId: number) {
   });
 
   if (!response.ok) {
-    throw new Error("Failed to delete mutant hunting request");
+    const result = await response.json().catch(() => null);
+    const error = new Error(
+      result?.message ?? "Failed to delete mutant hunting request"
+    ) as ApiError;
+    error.status = response.status;
+    throw error;
   }
 
   return response.json();

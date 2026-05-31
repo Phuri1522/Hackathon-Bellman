@@ -4,7 +4,7 @@ import { syncHunterRankScore } from "./huntRequest.service.js"
 import type { AutoMatchInput, UpdateHunterInput } from "../schemas/hunter.schema.js"
 
 const getRewardText = (reward: string | null | undefined): string =>
-  reward?.trim() ? reward : "No Reward"
+  reward?.trim() ? reward : "-"
 
 export const getHunterById = async (id: number) => {
   await syncHunterRankScore(id)

@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { prisma } from "../../../db.js";
+import { recommendClass } from "../../../utils/reccommend.js";
 import { syncHunterRankScore } from "../../hunt-matching/services/huntRequest.service.js";
 import {
   AcceptMutantHuntingRequestBody,
@@ -19,45 +20,22 @@ const VALID_STATUSES: MutantHuntingRequestStatus[] = [
 const MATCHMAKING_TIMEOUT_MS = 60 * 1000;
 
 const getRewardText = (reward: string | null | undefined): string =>
-  reward?.trim() ? reward : "No Reward";
+  reward?.trim() ? reward : "-";
 
 const withRewardText = <T extends { reward?: string | null }>(request: T) => ({
   ...request,
   reward: getRewardText(request.reward),
 });
 
-const normalizeType = (value: string): string => value.trim().toLowerCase();
-
 const uniqueClasses = (classes: string[]): string[] => [...new Set(classes)];
 
 const calculateRequiredClasses = (animalType: string): string[] => {
-  const animal = normalizeType(animalType);
-
-  if (animal === "wolf") {
-    return ["Fighter"];
-  }
-
-  if (animal === "bear" || animal === "boar") {
-    return ["Tanker"];
-  }
-
-  if (animal === "snake" || animal === "spider") {
-    return ["Ranger"];
-  }
-
-  if (animal === "tiger") {
-    return uniqueClasses(["Fighter", "Ranger"]);
-  }
-
-  if (animal === "rhino") {
-    return uniqueClasses(["Fighter", "Tanker"]);
-  }
-
-  if (animal === "dragon") {
-    return uniqueClasses(["Fighter", "Ranger", "Tanker"]);
-  }
-
-  return ["Fighter"];
+  const { requiredClasses } = recommendClass(animalType.trim().toUpperCase());
+  return uniqueClasses(
+    requiredClasses.map((hunterClass) =>
+      hunterClass.charAt(0) + hunterClass.slice(1).toLowerCase()
+    )
+  );
 };
 
 const parseNumericId = (id: unknown): number | null => {
@@ -294,7 +272,7 @@ export const deleteMutantHuntingRequest = async (
 
     if (request.userId !== userId) {
       res.status(403).json({
-        message: "You can only delete your own mutant hunting request",
+        message: "You are not allowed to delete this request.",
       });
       return;
     }

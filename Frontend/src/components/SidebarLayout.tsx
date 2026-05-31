@@ -13,21 +13,21 @@ export default function SidebarLayout({ map, sidebar }: Props) {
     <div className="flex h-screen overflow-hidden bg-[#050505] relative">
 
       {/* Map area */}
-      <div className="flex-1 h-full">
+      <div className="relative z-0 flex-1 h-full">
         {map}
       </div>
 
       {/* Mobile backdrop */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-30 md:hidden"
+          className="fixed inset-0 z-[9997] bg-black/50 md:hidden"
           onClick={() => setIsOpen(false)}
         />
       )}
 
       {/* Sidebar */}
       <div className={`
-        fixed bottom-0 left-0 right-0 h-[75vh] z-40
+        fixed bottom-0 left-0 right-0 h-[75vh] z-[9998]
         md:relative md:w-80 md:h-full md:translate-y-0
         bg-[#0f1115] border-t md:border-t-0 md:border-l border-[#2d3748]
         transition-transform duration-300 ease-in-out overflow-y-auto
@@ -43,7 +43,7 @@ export default function SidebarLayout({ map, sidebar }: Props) {
 
       {/* Mobile FAB */}
       <button
-        className="md:hidden fixed bottom-6 right-6 z-50 w-12 h-12 rounded-full bg-[#39ff14] text-black flex items-center justify-center text-xl shadow-lg active:scale-95 transition-transform"
+        className="md:hidden fixed bottom-6 right-6 z-[9999] w-12 h-12 rounded-full bg-[#39ff14] text-black flex items-center justify-center text-xl shadow-lg active:scale-95 transition-transform"
         onClick={() => setIsOpen(!isOpen)}
       >
         {isOpen ? "✕" : "☰"}

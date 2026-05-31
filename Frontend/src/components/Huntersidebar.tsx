@@ -4,7 +4,6 @@ import { useAuth } from "../contexts/AuthContext"
 import { useNavigate } from "react-router-dom"
 import HunterProfileOverlay from "./HunterProfileOverlay"
 import LogoutModal from "./LogoutModal"
-import api from "../services/api"
 
 const RANK_COLOR: Record<string, string> = {
   S: "bg-[#39ff14] text-black",
@@ -81,10 +80,6 @@ function calculateRankFromScore(score: number) {
   if (score >= 400) return "B";
   if (score >= 200) return "C";
   return "D";
-}
-
-function getRankCap(rank: string) {
-  return RANK_SCORE_CAP[rank] ?? RANK_SCORE_CAP.D;
 }
 
 function formatRankScore(rankScore: number, rank: string) {

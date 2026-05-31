@@ -17,7 +17,7 @@ const RANK_THRESHOLDS: Record<string, number> = {
 }
 
 const getRewardText = (reward: string | null | undefined): string =>
-  reward?.trim() ? reward : "No Reward"
+  reward?.trim() ? reward : "-"
 
 export const calculateRank = (score: number): string => {
   if (score >= 1000) return "S"

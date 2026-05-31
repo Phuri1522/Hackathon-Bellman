@@ -18,6 +18,7 @@ import {
   deleteMutantHuntingRequest,
   getMutantHuntingRequests,
 } from "../modules/MutantHuntingRequestSystem/mutantHunting.api"
+import { useAuth } from "../contexts/AuthContext"
 import type {
   MapPoint,
   MutantHuntingRequest,
@@ -178,6 +179,7 @@ export default function HunterMap({
   hasActiveTask = false,
   onRequestsChanged,
 }: HunterMapProps) {
+  const { user } = useAuth()
   const location = useLocation()
   const [posts, setPosts] = useState<MutantHuntingRequest[]>([])
   const [selectedPost, setSelectedPost] = useState<MutantHuntingRequest | null>(null)
@@ -286,24 +288,31 @@ export default function HunterMap({
   }
 
   async function handleDeleteSelectedPost() {
-    if (!selectedPost || isDeleting) return
+    if (!selectedPost || !user || isDeleting) return
 
     setIsDeleting(true)
 
     try {
-      await deleteMutantHuntingRequest(selectedPost.id, selectedPost.userId)
-      setPosts((currentPosts) =>
-        currentPosts.filter((post) => post.id !== selectedPost.id)
-      )
+      await deleteMutantHuntingRequest(selectedPost.id, user.id)
       setSelectedPost(null)
       setShowMiniOverlay(false)
       setShowDetails(false)
       setNotification("Post deleted successfully")
+      loadPosts()
+      onRequestsChanged?.()
       setTimeout(() => {
         setNotification(null)
       }, 2000)
     } catch (error) {
       console.error(error)
+      setNotification(
+        error instanceof Error
+          ? error.message
+          : "Failed to delete mutant hunting request"
+      )
+      setTimeout(() => {
+        setNotification(null)
+      }, 2500)
     } finally {
       setIsDeleting(false)
     }
@@ -349,14 +358,14 @@ export default function HunterMap({
         </div>
       )}
 
-      <div className={showDetails ? "h-[42vh] w-full md:h-full md:w-[60%]" : "h-full w-full"}>
+      <div className={showDetails ? "relative z-0 h-[42vh] w-full md:h-full md:w-[60%]" : "relative z-0 h-full w-full"}>
         <MapContainer
           center={defaultCenter}
           zoom={13}
           scrollWheelZoom
           zoomControl
           attributionControl={false}
-          className="h-full w-full"
+          className="relative z-0 h-full w-full"
         >
           <SelectedPostMapController
             focusTarget={focusTarget}
@@ -417,6 +426,7 @@ export default function HunterMap({
               distance={selectedPostDistance}
               onViewMap={handleViewMap}
               onDelete={handleDeleteSelectedPost}
+              canDelete={selectedPost.userId === user?.id}
             />
           ) : (
             <HunterPostDetails

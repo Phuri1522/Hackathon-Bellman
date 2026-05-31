@@ -12,6 +12,14 @@ export default function AvatarUpload({ preview, accentColor = "#39ff14", onFileC
 
   return (
     <div className="flex flex-col items-center gap-4">
+      {preview && (
+        <img
+          src={preview}
+          alt="Selected avatar preview"
+          className="h-20 w-20 rounded-full border object-cover"
+          style={{ borderColor: accentColor }}
+        />
+      )}
       <label
         className="cursor-pointer border border-dashed rounded-lg p-4 w-full text-center transition-colors hover:opacity-80"
         style={{ borderColor: accentColor }}
