@@ -211,18 +211,19 @@ export default function HunterSidebar({
     }
   }, [])
 
-  const handleToggle = async () => {
-    const next = !autoMatch
-    setAutoMatch(next)
-    onAutoMatchChange?.(next)
-    try {
-      if (hunter.id) {
-        await api.patch(`/api/hunters/${hunter.id}/auto-match`, { autoMatch: next })
-      }
-    } catch (error) {
-      console.error("Failed to persist Auto Match preference", error)
-    }
+const handleToggle = () => {
+  const next = !autoMatch;
+
+  setAutoMatch(next);
+  onAutoMatchChange?.(next);
+
+  if (hunter.id) {
+    localStorage.setItem(
+      `hunter-auto-match-${hunter.id}`,
+      JSON.stringify(next)
+    );
   }
+};
 
   const handleAcceptMatchmaking = (taskId: number) => {
     if (hasActiveTask) return
