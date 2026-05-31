@@ -59,3 +59,41 @@ export async function deleteMutantHuntingRequest(id: number, userId: number) {
 
   return response.json();
 }
+
+export async function acceptMutantHuntingRequest(id: number, hunterId: number) {
+  const response = await fetch(`${API_BASE_URL}/mutant-hunting-requests/${id}/accept`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ hunterId }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(
+      `Failed to accept mutant hunting request (${response.status}): ${errorText}`
+    );
+  }
+
+  return response.json();
+}
+
+export async function completeMutantHuntingRequest(id: number, hunterId: number) {
+  const response = await fetch(`${API_BASE_URL}/mutant-hunting-requests/${id}/complete`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ hunterId }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(
+      `Failed to complete mutant hunting request (${response.status}): ${errorText}`
+    );
+  }
+
+  return response.json();
+}

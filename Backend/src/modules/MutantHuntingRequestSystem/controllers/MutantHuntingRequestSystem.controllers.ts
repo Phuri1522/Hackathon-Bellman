@@ -1,7 +1,9 @@
 import { Request, Response } from "express";
 import { prisma } from "../../../db.js";
+import { syncHunterRankScore } from "../../hunt-matching/services/huntRequest.service.js";
 import {
   AcceptMutantHuntingRequestBody,
+  CompleteMutantHuntingRequestBody,
   CreateMutantHuntingRequestBody,
   DeleteMutantHuntingRequestBody,
   MutantHuntingRequestStatus,
@@ -15,6 +17,14 @@ const VALID_STATUSES: MutantHuntingRequestStatus[] = [
 ];
 
 const MATCHMAKING_TIMEOUT_MS = 60 * 1000;
+
+const getRewardText = (reward: string | null | undefined): string =>
+  reward?.trim() ? reward : "No Reward";
+
+const withRewardText = <T extends { reward?: string | null }>(request: T) => ({
+  ...request,
+  reward: getRewardText(request.reward),
+});
 
 const normalizeType = (value: string): string => value.trim().toLowerCase();
 
@@ -148,7 +158,7 @@ export const createMutantHuntingRequest = async (
       message: "Mutant hunting request created successfully",
       classRequired,
       requiredClasses,
-      data: request,
+      data: withRewardText(request),
     });
   } catch (error) {
     res.status(500).json({
@@ -200,7 +210,7 @@ export const getAllMutantHuntingRequests = async (
 
     res.status(200).json({
       message: "Mutant hunting requests fetched successfully",
-      data: requests,
+      data: requests.map(withRewardText),
     });
   } catch (error) {
     res.status(500).json({
@@ -248,7 +258,7 @@ export const getMutantHuntingRequestById = async (
 
     res.status(200).json({
       message: "Mutant hunting request fetched successfully",
-      data: request,
+      data: withRewardText(request),
     });
   } catch (error) {
     res.status(500).json({
@@ -331,6 +341,23 @@ export const acceptMutantHuntingRequest = async (
       return;
     }
 
+    const activeTask = await prisma.huntRequest.findFirst({
+      where: {
+        hunterId,
+        status: { in: ["ACCEPTED", "IN_PROGRESS"] },
+        post: {
+          status: { in: ["ACCEPTED", "IN_PROGRESS"] },
+        },
+      },
+    });
+
+    if (activeTask) {
+      res.status(400).json({
+        message: "Complete your current task before accepting another request.",
+      });
+      return;
+    }
+
     const request = await prisma.post.findUnique({ where: { id } });
     if (!request) {
       res.status(404).json({ message: "Mutant hunting request not found" });
@@ -390,6 +417,102 @@ export const acceptMutantHuntingRequest = async (
   } catch (error) {
     res.status(500).json({
       message: "Failed to accept mutant hunting request",
+      error,
+    });
+  }
+};
+
+export const completeMutantHuntingRequest = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const id = parseNumericId(req.params.id);
+    const body = req.body as CompleteMutantHuntingRequestBody;
+
+    if (!id) {
+      res.status(400).json({ message: "id must be numeric" });
+      return;
+    }
+
+    const hunterId = await getRequestHunterId(req, body);
+    if (!hunterId) {
+      res.status(400).json({ message: "hunterId is required" });
+      return;
+    }
+
+    const request = await prisma.post.findUnique({
+      where: { id },
+      include: { huntRequests: true },
+    });
+
+    if (!request) {
+      res.status(404).json({ message: "Mutant hunting request not found" });
+      return;
+    }
+
+    if (request.status === "COMPLETED") {
+      res.status(400).json({ message: "This mutant hunting request is already completed" });
+      return;
+    }
+
+    if (request.status !== "ACCEPTED" && request.status !== "IN_PROGRESS") {
+      res.status(400).json({
+        message: "Only accepted or in-progress mutant hunting requests can be completed",
+      });
+      return;
+    }
+
+    const huntRequest = request.huntRequests.find(
+      (item) => item.hunterId === hunterId
+    );
+
+    if (!huntRequest) {
+      res.status(403).json({
+        message: "You can only complete a mutant hunting request assigned to you",
+      });
+      return;
+    }
+
+    const result = await prisma.$transaction(async (tx: any) => {
+      await tx.huntRequest.updateMany({
+        where: { postId: id, hunterId },
+        data: { status: "COMPLETED" },
+      });
+
+      const completedPost = await tx.post.update({
+        where: { id },
+        data: { status: "COMPLETED" },
+        include: {
+          user: {
+            select: { id: true, name: true, email: true, avatarUrl: true },
+          },
+          huntRequests: {
+            include: {
+              hunter: {
+                include: {
+                  user: {
+                    select: { id: true, name: true, email: true, avatarUrl: true },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      return completedPost;
+    });
+
+    await syncHunterRankScore(hunterId);
+
+    res.status(200).json({
+      message: "Mutant hunting request completed successfully",
+      data: withRewardText(result),
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to complete mutant hunting request",
       error,
     });
   }

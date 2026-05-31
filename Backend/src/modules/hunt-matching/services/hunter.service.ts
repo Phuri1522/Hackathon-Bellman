@@ -1,8 +1,14 @@
 import { prisma } from "../../../db.js"
 import { uploadToCloudinary } from "../../../middlewares/upload.js"
+import { syncHunterRankScore } from "./huntRequest.service.js"
 import type { AutoMatchInput, UpdateHunterInput } from "../schemas/hunter.schema.js"
 
+const getRewardText = (reward: string | null | undefined): string =>
+  reward?.trim() ? reward : "No Reward"
+
 export const getHunterById = async (id: number) => {
+  await syncHunterRankScore(id)
+
   const hunter = await prisma.hunter.findUnique({
     where: { id },
     include: {
@@ -105,7 +111,7 @@ export const getWeeklySummary = async (hunterId: number) => {
     id: r.id,
     animalType: r.post.animalType,
     mutantType: r.post.mutantType,
-    reward: r.post.reward,
+    reward: getRewardText(r.post.reward),
     completedAt: r.createdAt,
     powerScore:
       ANIMAL_WEIGHTS[r.post.animalType] * MUTANT_WEIGHTS[r.post.mutantType],

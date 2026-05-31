@@ -1,6 +1,6 @@
 import "leaflet/dist/leaflet.css"
 import { divIcon } from "leaflet"
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useLocation } from "react-router-dom"
 import {
   MapContainer,
@@ -14,6 +14,7 @@ import PostPinOverlay from "../modules/MutantHuntingRequestSystem/components/Pos
 import UserPostDetails from "../modules/MutantHuntingRequestSystem/components/UserPostDetails"
 import HunterPostDetails from "../modules/MutantHuntingRequestSystem/components/HunterPostDetails"
 import {
+  acceptMutantHuntingRequest,
   deleteMutantHuntingRequest,
   getMutantHuntingRequests,
 } from "../modules/MutantHuntingRequestSystem/mutantHunting.api"
@@ -26,7 +27,12 @@ type Role = "user" | "hunter"
 
 type HunterMapProps = {
   role?: Role
+  hunterId?: number
+  hasActiveTask?: boolean
+  onRequestsChanged?: () => void
 }
+
+const ACTIVE_TASK_MESSAGE = "Complete your current task before accepting another match."
 
 const BANGKOK_LOCATION: MapPoint = {
   lat: 13.7563,
@@ -37,15 +43,7 @@ const defaultCenter: [number, number] = [BANGKOK_LOCATION.lat, BANGKOK_LOCATION.
 
 const mutantIcon = divIcon({
   className: "",
-  html: `<div style="
-    height:18px;
-    width:18px;
-    border-radius:9999px;
-    background:#b7410e;
-    border:2px solid #050505;
-    box-shadow:0 0 18px #b7410e;
-    cursor:pointer;
-  "></div>`,
+  html: '<div style="height:18px;width:18px;border-radius:9999px;background:#b7410e;border:2px solid #050505;box-shadow:0 0 18px #b7410e;"></div>',
   iconSize: [18, 18],
   iconAnchor: [9, 9],
 })
@@ -92,138 +90,94 @@ function MapClickCloser({ onClose }: { onClose: () => void }) {
   return null
 }
 
-export type HunterMapHandle = {
-  flyTo: (lat: number, lng: number, zoom: number) => void
-  selectPost: (post: MutantHuntingRequest) => void
-}
-
-type FlyToHandle = { flyTo: (lat: number, lng: number, zoom: number) => void }
-
-function MapFlyController({ innerRef }: { innerRef: React.Ref<FlyToHandle> }) {
-  const map = useMap()
-  useImperativeHandle(innerRef, () => ({
-    flyTo(lat, lng, zoom) {
-      map.flyTo([lat, lng], zoom)
-    },
-  }))
-  return null
-}
-
 function SelectedPostMapController({
   focusTarget,
   focusRequest,
 }: {
-  marker: MapMarkerData;
-  isHunter: boolean;
-  onClose: () => void;
-  onViewPost: (id: number) => void;
+  focusTarget: MapPoint | null
+  focusRequest: number
 }) {
-  const map = useMap();
-  const [pos, setPos] = useState(() =>
-    map.latLngToContainerPoint([marker.latitude, marker.longitude])
-  );
+  const map = useMap()
 
-  // อัพเดทตำแหน่ง overlay ตามเมื่อ map ขยับ/ซูม
-  function update() {
-    setPos(map.latLngToContainerPoint([marker.latitude, marker.longitude]));
+  useEffect(() => {
+    if (!focusTarget || focusRequest === 0) return
+
+    map.flyTo([focusTarget.lat, focusTarget.lng], Math.max(map.getZoom(), 15))
+  }, [focusRequest, focusTarget, map])
+
+  return null
+}
+
+function InitialUserLocationController({ userLocation }: { userLocation: MapPoint }) {
+  const map = useMap()
+  const [hasCenteredOnUser, setHasCenteredOnUser] = useState(false)
+
+  useEffect(() => {
+    if (hasCenteredOnUser) return
+
+    map.setView([userLocation.lat, userLocation.lng], Math.max(map.getZoom(), 15))
+    setHasCenteredOnUser(true)
+  }, [hasCenteredOnUser, map, userLocation])
+
+  return null
+}
+
+function PostOverlayMarker({
+  post,
+  isVisible,
+  onOverlayClick,
+}: {
+  post: MutantHuntingRequest
+  isVisible: boolean
+  onOverlayClick: () => void
+}) {
+  const map = useMap()
+  const [position, setPosition] = useState(() =>
+    map.latLngToContainerPoint([post.latitude, post.longitude])
+  )
+
+  function updatePosition() {
+    setPosition(map.latLngToContainerPoint([post.latitude, post.longitude]))
   }
 
   useEffect(() => {
-    update();
-  }, [marker.latitude, marker.longitude]);
+    updatePosition()
+  }, [post.latitude, post.longitude])
 
-  useMapEvents({ move: update, zoom: update, resize: update });
-
-  const fallbackImage =
-    "https://images.unsplash.com/photo-1546182990-dffeafbe841d?w=400";
-  const image = marker.picture || fallbackImage;
-  const title = `${marker.mutantType} ${marker.animalType}`;
+  useMapEvents({
+    move: updatePosition,
+    resize: updatePosition,
+    zoom: updatePosition,
+  })
 
   return (
-    // ใช้ pointer-events-none บน container หลักเพื่อไม่ให้บัง map
-    // แต่ pointer-events-auto บน card เพื่อให้กดได้
     <div
-      className="pointer-events-none absolute z-[500]"
-      style={{
-        left: pos.x,
-        top: pos.y,
-        transform: "translate(-50%, calc(-100% - 20px))",
-      }}
+      className={
+        isVisible
+          ? "pointer-events-auto absolute z-[500] -translate-x-1/2 -translate-y-[calc(100%+34px)] opacity-100 transition-opacity duration-200"
+          : "pointer-events-none absolute z-[500] -translate-x-1/2 -translate-y-[calc(100%+34px)] opacity-0 transition-opacity duration-200"
+      }
+      style={{ left: position.x, top: position.y }}
     >
-      {/* Card ── ใช้ design เดียวกับ PostPinOverlay ของเพื่อน */}
-      <div className="pointer-events-auto w-52 rounded-xl border border-[#2d3748] bg-[#0f1115] p-3 text-[#e5e7eb] shadow-[0_0_18px_rgba(57,255,20,0.25)] transition-all duration-200 hover:border-[#39ff14]">
-        
-        {/* ปุ่มปิด */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onClose();
-          }}
-          className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-[#1a1f2e] text-xs text-[#9ca3af] hover:text-white"
-        >
-          ✕
-        </button>
-
-        {/* รูปภาพ */}
-        <img
-          src={image}
-          alt={title}
-          className="h-28 w-full rounded-lg object-cover"
-          onError={(e) => {
-            (e.target as HTMLImageElement).src = fallbackImage;
-          }}
-        />
-
-        {/* ชื่อ mutant ── เขียวเรือง เหมือน design เดิม */}
-        <h2 className="mt-3 text-center text-lg font-bold text-[#39ff14]">
-          {title}
-        </h2>
-
-        {/* รายละเอียด */}
-        <div className="mt-2 space-y-1 text-xs">
-          <p>
-            <span className="text-[#9ca3af]">Class: </span>
-            <span className="text-[#e5e7eb]">{marker.classRequired}</span>
-          </p>
-          {marker.reward && (
-            <p className="font-semibold text-[#39ff14]">
-              Reward: {marker.reward}
-            </p>
-          )}
-          {marker.description && (
-            <p className="line-clamp-2 text-[#9ca3af]">{marker.description}</p>
-          )}
-        </div>
-
-        {/* ปุ่ม Hunt! โชว์เฉพาะ Hunter */}
-        {isHunter && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onViewPost(marker.id);
-            }}
-            className="mt-3 w-full rounded bg-red-600 py-1 text-sm font-bold text-white transition hover:bg-red-700"
-          >
-            Hunt!
-          </button>
-        )}
-      </div>
-
-      {/* Arrow ชี้ลงหา marker */}
-      <div
-        className="mx-auto h-0 w-0"
-        style={{
-          borderLeft: "8px solid transparent",
-          borderRight: "8px solid transparent",
-          borderTop: "8px solid #2d3748",
+      <PostPinOverlay
+        mode="preview"
+        image={post.picture ?? post.imageUrl ?? null}
+        title={getPostTitle(post)}
+        onViewPost={(event) => {
+          event.stopPropagation()
+          onOverlayClick()
         }}
       />
     </div>
   )
 }
 
-const HunterMap = forwardRef<HunterMapHandle, HunterMapProps>(function HunterMap({ role = "hunter" }, ref) {
-  const flyRef = useRef<FlyToHandle>(null)
+export default function HunterMap({
+  role = "hunter",
+  hunterId,
+  hasActiveTask = false,
+  onRequestsChanged,
+}: HunterMapProps) {
   const location = useLocation()
   const [posts, setPosts] = useState<MutantHuntingRequest[]>([])
   const [selectedPost, setSelectedPost] = useState<MutantHuntingRequest | null>(null)
@@ -233,18 +187,9 @@ const HunterMap = forwardRef<HunterMapHandle, HunterMapProps>(function HunterMap
   const [focusRequest, setFocusRequest] = useState(0)
   const [focusTarget, setFocusTarget] = useState<MapPoint | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isApplying, setIsApplying] = useState(false)
   const [notification, setNotification] = useState<string | null>(null)
-
-  useImperativeHandle(ref, () => ({
-    flyTo(lat, lng, zoom) {
-      flyRef.current?.flyTo(lat, lng, zoom)
-    },
-    selectPost(post) {
-      setSelectedPost(post)
-      setShowMiniOverlay(true)
-      setShowDetails(true)
-    },
-  }))
+  const [hasResolvedInitialLocation, setHasResolvedInitialLocation] = useState(false)
 
   const selectedPostDistance = useMemo(() => {
     if (!selectedPost) return "0.0 km"
@@ -284,7 +229,7 @@ const HunterMap = forwardRef<HunterMapHandle, HunterMapProps>(function HunterMap
   useEffect(() => {
     window.addEventListener("focus", loadPosts)
     window.addEventListener("mutant-hunting-request-created", loadPosts)
-    const intervalId = window.setInterval(loadPosts, 8000)
+    const intervalId = window.setInterval(loadPosts, 15000)
 
     return () => {
       window.removeEventListener("focus", loadPosts)
@@ -294,65 +239,117 @@ const HunterMap = forwardRef<HunterMapHandle, HunterMapProps>(function HunterMap
   }, [loadPosts])
 
   useEffect(() => {
-    let isFirstFetch = true;
+    if (!navigator.geolocation) {
+      setUserLocation(BANGKOK_LOCATION)
+      setHasResolvedInitialLocation(true)
+      return
+    }
 
-    const fetchMarkers = async () => {
-      try {
-        // แสดง loading spinner เฉพาะครั้งแรก ครั้งถัดไป update เงียบๆ
-        if (isFirstFetch) setLoading(true);
-        const data = await getMapMarkers();
-        setMarkers(data);
-        setError(null);
-      } catch (err) {
-        console.error("Error fetching map markers:", err);
-        // แสดง error เฉพาะครั้งแรก ไม่ให้ทำลาย UX ระหว่าง poll
-        if (isFirstFetch) setError("ไม่สามารถโหลดข้อมูล Post บน Map ได้");
-      } finally {
-        if (isFirstFetch) {
-          setLoading(false);
-          isFirstFetch = false;
-        }
-      }
-    };
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        setUserLocation({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        })
+        setHasResolvedInitialLocation(true)
+      },
+      () => {
+        setUserLocation(BANGKOK_LOCATION)
+        setHasResolvedInitialLocation(true)
+      },
+    )
 
-    fetchMarkers();
-    const interval = setInterval(fetchMarkers, 3000);
+    return () => {
+      navigator.geolocation.clearWatch(watchId)
+    }
+  }, [])
 
-    // cleanup เมื่อ component unmount
-    return () => clearInterval(interval);
-  }, []);
+  function handleMapSpaceClick() {
+    setShowMiniOverlay(false)
+    setShowDetails(false)
+  }
 
-  // นำ Hunter ไปหน้า HuntRoomDetails เมื่อกด Hunt!
-  const handleViewPost = (postId: number) => {
-    window.location.href = `/hunter/hunt-room/${postId}`;
-  };
+  function handlePostMarkerClick(post: MutantHuntingRequest) {
+    setSelectedPost(post)
+    setShowMiniOverlay(true)
+    setShowDetails(true)
+  }
+
+  function handleViewMap() {
+    if (!selectedPost) return
+
+    setFocusTarget({
+      lat: selectedPost.latitude,
+      lng: selectedPost.longitude,
+    })
+    setFocusRequest((current) => current + 1)
+  }
+
+  async function handleDeleteSelectedPost() {
+    if (!selectedPost || isDeleting) return
+
+    setIsDeleting(true)
+
+    try {
+      await deleteMutantHuntingRequest(selectedPost.id, selectedPost.userId)
+      setPosts((currentPosts) =>
+        currentPosts.filter((post) => post.id !== selectedPost.id)
+      )
+      setSelectedPost(null)
+      setShowMiniOverlay(false)
+      setShowDetails(false)
+      setNotification("Post deleted successfully")
+      setTimeout(() => {
+        setNotification(null)
+      }, 2000)
+    } catch (error) {
+      console.error(error)
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  async function handleApplySelectedPost() {
+    if (!selectedPost || !hunterId || isApplying) return
+    if (hasActiveTask) {
+      setNotification(ACTIVE_TASK_MESSAGE)
+      setTimeout(() => {
+        setNotification(null)
+      }, 2500)
+      return
+    }
+
+    setIsApplying(true)
+
+    try {
+      await acceptMutantHuntingRequest(selectedPost.id, hunterId)
+      setPosts((currentPosts) =>
+        currentPosts.filter((post) => post.id !== selectedPost.id)
+      )
+      setSelectedPost(null)
+      setShowMiniOverlay(false)
+      setShowDetails(false)
+      setNotification("Room applied")
+      onRequestsChanged?.()
+      setTimeout(() => {
+        setNotification(null)
+      }, 2000)
+    } catch (error) {
+      console.error(error)
+    } finally {
+      setIsApplying(false)
+    }
+  }
 
   return (
-    <div className="relative w-full h-full">
-      {/* Loading state */}
-      {loading && (
-        <div className="absolute inset-0 z-[999] flex items-center justify-center bg-[#050505]/80">
-          <p className="font-mono text-sm text-[#39ff14] animate-pulse">
-            [ LOADING MAP DATA... ]
-          </p>
+    <div className="flex h-full w-full flex-col bg-[#050505] text-[#e5e7eb] md:flex-row">
+      {notification && (
+        <div className="fixed left-1/2 top-5 z-[1000] -translate-x-1/2 rounded border border-[#39ff14] bg-[#0f1115] px-5 py-3 text-sm text-[#39ff14] shadow-[0_0_14px_rgba(57,255,20,0.35)]">
+          {notification}
         </div>
       )}
 
-      {/* Error state */}
-      {error && (
-        <div className="absolute top-4 left-1/2 z-[999] -translate-x-1/2 rounded border border-red-600/50 bg-[#0f1115] px-4 py-2 text-sm text-red-400">
-          {error}
-        </div>
-      )}
-
-      <div className={`relative ${showDetails ? "h-[42vh] w-full md:h-full md:w-[60%]" : "h-full w-full"}`}>
-        <button
-          onClick={() => flyRef.current?.flyTo(userLocation.lat, userLocation.lng, 15)}
-          className="absolute bottom-5 right-5 z-500 bg-[#0f1115] border border-[#39ff14] text-[#39ff14] rounded px-3 py-2 text-xs hover:bg-[#39ff1415] transition-colors shadow-lg"
-          style={{ fontFamily: "Orbitron, monospace" }}
-        >
-          ◎ ME
-        </button>
+      <div className={showDetails ? "h-[42vh] w-full md:h-full md:w-[60%]" : "h-full w-full"}>
         <MapContainer
           center={defaultCenter}
           zoom={13}
@@ -365,6 +362,9 @@ const HunterMap = forwardRef<HunterMapHandle, HunterMapProps>(function HunterMap
             focusTarget={focusTarget}
             focusRequest={focusRequest}
           />
+          {hasResolvedInitialLocation && (
+            <InitialUserLocationController userLocation={userLocation} />
+          )}
           <MapClickCloser onClose={handleMapSpaceClick} />
 
           <TileLayer
@@ -406,7 +406,6 @@ const HunterMap = forwardRef<HunterMapHandle, HunterMapProps>(function HunterMap
               }}
             />
           )}
-          <MapFlyController innerRef={flyRef} />
         </MapContainer>
       </div>
 
@@ -424,12 +423,14 @@ const HunterMap = forwardRef<HunterMapHandle, HunterMapProps>(function HunterMap
               post={selectedPost}
               distance={selectedPostDistance}
               onViewMap={handleViewMap}
+              onApply={handleApplySelectedPost}
+              isApplying={isApplying}
+              applyDisabled={hasActiveTask}
+              applyDisabledMessage={hasActiveTask ? ACTIVE_TASK_MESSAGE : undefined}
             />
           )}
         </section>
       )}
     </div>
   )
-})
-
-export default HunterMap
+}

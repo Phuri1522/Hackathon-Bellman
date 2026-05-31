@@ -60,6 +60,8 @@ export default function CreatePostForm({
     const [showError, setShowError] = useState(false);
     const [errorMessage, setErrorMessage] = useState("Failed to submit post");
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isImageUploading, setIsImageUploading] = useState(false);
+    const [imageUploadError, setImageUploadError] = useState<string | null>(null);
     const [animalType, setAnimalType] = useState(ANIMAL_TYPES[0]);
     const [mutantType, setMutantType] = useState(MUTANT_TYPES[0]);
     const [reward, setReward] = useState("");
@@ -89,6 +91,7 @@ export default function CreatePostForm({
         setDescription("");
         setImageUrl(DEFAULT_IMAGE_URL);
         setImagePreview(null);
+        setImageUploadError(null);
     }
 
     async function handleSubmit() {
@@ -99,6 +102,26 @@ export default function CreatePostForm({
 
         if (!selectedPin) {
             setErrorMessage("Please select a mutant sighting pin on the map");
+            setShowError(true);
+
+            setTimeout(() => {
+                setShowError(false);
+            }, 2500);
+            return;
+        }
+
+        if (isImageUploading) {
+            setErrorMessage("Please wait for the image upload to finish");
+            setShowError(true);
+
+            setTimeout(() => {
+                setShowError(false);
+            }, 2500);
+            return;
+        }
+
+        if (imageUploadError) {
+            setErrorMessage(imageUploadError);
             setShowError(true);
 
             setTimeout(() => {
@@ -161,7 +184,10 @@ export default function CreatePostForm({
                     {errorMessage}
                 </div>
             )}
-            <h1 className="text-2xl font-bold text-[#39ff14] md:text-4xl">
+            <h1
+                className="whitespace-nowrap text-2xl font-bold leading-tight text-[#39ff14] md:text-3xl"
+                style={{ fontFamily: "Orbitron, monospace" }}
+            >
                 POST MUTANT SIGHTING
             </h1>
 
@@ -227,9 +253,26 @@ export default function CreatePostForm({
 
             <ImageUploadBox
                 preview={imagePreview}
-                onImageChange={(nextImageUrl) => {
-                    setImagePreview(nextImageUrl);
-                    setImageUrl(nextImageUrl);
+                onPreviewChange={(nextPreviewUrl) => {
+                    setImagePreview(nextPreviewUrl);
+                    setImageUploadError(null);
+                }}
+                onImageChange={(cloudinaryUrl) => {
+                    setImagePreview(cloudinaryUrl);
+                    setImageUrl(cloudinaryUrl);
+                    setImageUploadError(null);
+                }}
+                onUploadingChange={(nextIsUploading) => {
+                    setIsImageUploading(nextIsUploading);
+                }}
+                onUploadError={(message) => {
+                    setImageUploadError(message);
+                    setErrorMessage(message);
+                    setShowError(true);
+
+                    setTimeout(() => {
+                        setShowError(false);
+                    }, 2500);
                 }}
             />
 
@@ -242,7 +285,7 @@ export default function CreatePostForm({
 
             <div className="mt-4 flex flex-wrap gap-4">
                 <CancelButton />
-                <SubmitSightingButton onClick={handleSubmit} disabled={isSubmitting} />
+                <SubmitSightingButton onClick={handleSubmit} disabled={isSubmitting || isImageUploading} />
             </div>
         </>
     );

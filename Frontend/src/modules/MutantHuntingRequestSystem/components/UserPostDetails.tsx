@@ -57,7 +57,10 @@ export default function UserPostDetails({
 
     return (
         <>
-            <h1 className="text-2xl font-bold text-[#39ff14] md:text-4xl">
+            <h1
+                className="whitespace-nowrap text-2xl font-bold leading-tight text-[#39ff14] md:text-3xl"
+                style={{ fontFamily: "Orbitron, monospace" }}
+            >
                 POST MUTANT DETAILS
             </h1>
 

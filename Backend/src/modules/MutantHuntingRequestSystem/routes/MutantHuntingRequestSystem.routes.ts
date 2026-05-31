@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   acceptMutantHuntingRequest,
+  completeMutantHuntingRequest,
   createMutantHuntingRequest,
   deleteMutantHuntingRequest,
   getAllMutantHuntingRequests,
@@ -16,6 +17,10 @@ router.delete("/mutant-hunting-requests/:id", deleteMutantHuntingRequest);
 router.patch(
   "/mutant-hunting-requests/:id/accept",
   acceptMutantHuntingRequest
+);
+router.patch(
+  "/mutant-hunting-requests/:id/complete",
+  completeMutantHuntingRequest
 );
 
 export default router;

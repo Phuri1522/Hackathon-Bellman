@@ -42,6 +42,7 @@ export type MutantHuntingRequestStatus =
   | "MATCHMAKING"
   | "PUBLIC"
   | "ACCEPTED"
+  | "IN_PROGRESS"
   | "COMPLETED";
 
 export type MapPoint = {
@@ -71,4 +72,16 @@ export type MutantHuntingRequest = {
   reward?: string | null;
   status: MutantHuntingRequestStatus;
   createdAt?: string;
+  updatedAt?: string;
+  acceptedAt?: string | null;
+  acceptedById?: number | null;
+  hunterId?: number | null;
+  huntRequests?: {
+    id: number;
+    hunterId?: number | null;
+    status?: string;
+    createdAt?: string;
+    updatedAt?: string;
+    acceptedAt?: string | null;
+  }[];
 };

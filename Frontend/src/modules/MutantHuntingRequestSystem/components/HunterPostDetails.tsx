@@ -2,7 +2,6 @@ import ViewPostButton from "./ViewPostButton";
 import ApplyButton from "./ApplyButton";
 import { useState } from "react";
 import type { MutantHuntingRequest } from "../types/mutantHunting.type";
-import api from "../../../services/api";
 
 const POST_DETAILS = {
     animalType: "Wolf",
@@ -18,6 +17,10 @@ type PostDetailsProps = {
     post?: MutantHuntingRequest | null;
     distance?: string;
     onViewMap?: () => void;
+    onApply?: () => void;
+    isApplying?: boolean;
+    applyDisabled?: boolean;
+    applyDisabledMessage?: string;
 };
 
 function displayValue(value: string | null | undefined, fallback = "-") {
@@ -37,10 +40,16 @@ function DetailField({ label, value }: { label: string; value: string }) {
     );
 }
 
-export default function HunterPostDetails({ post, distance, onViewMap }: PostDetailsProps) {
+export default function HunterPostDetails({
+    post,
+    distance,
+    onViewMap,
+    onApply,
+    isApplying = false,
+    applyDisabled = false,
+    applyDisabledMessage,
+}: PostDetailsProps) {
     const [showSuccess, setShowSuccess] = useState(false);
-    const [showError, setShowError] = useState(false);
-    const [errorMessage, setErrorMessage] = useState("");
     const details = {
         animalType: post?.animalType ?? POST_DETAILS.animalType,
         mutantType: post?.mutantType ?? POST_DETAILS.mutantType,
@@ -50,19 +59,17 @@ export default function HunterPostDetails({ post, distance, onViewMap }: PostDet
         distance: distance ?? POST_DETAILS.distance,
         imageUrl: post?.picture ?? post?.imageUrl ?? POST_DETAILS.imageUrl,
     };
-    async function handleSubmit() {
-        if (!post) return;
-        try {
-            await api.post("/api/hunt-requests", { postId: post.id });
-            setShowSuccess(true);
-            window.dispatchEvent(new Event("hunt-request-applied"));
-            setTimeout(() => setShowSuccess(false), 2500);
-        } catch (err: any) {
-            const msg = err?.response?.data?.error ?? "Failed to apply";
-            setErrorMessage(msg);
-            setShowError(true);
-            setTimeout(() => setShowError(false), 2500);
+    function handleSubmit() {
+        if (onApply) {
+            onApply();
+            return;
         }
+
+        setShowSuccess(true);
+
+        setTimeout(() => {
+            setShowSuccess(false);
+        }, 2500);
     }
 
     return (
@@ -72,12 +79,10 @@ export default function HunterPostDetails({ post, distance, onViewMap }: PostDet
                     Room applied
                 </div>
             )}
-            {showError && (
-                <div className="fixed right-5 top-5 z-50 rounded border border-[#b7410e] bg-[#0f1115] px-5 py-3 text-sm text-[#ff7a45] shadow-[0_0_14px_rgba(183,65,14,0.35)]">
-                    {errorMessage}
-                </div>
-            )}
-            <h1 className="text-2xl font-bold text-[#39ff14] md:text-4xl">
+            <h1
+                className="whitespace-nowrap text-2xl font-bold leading-tight text-[#39ff14] md:text-3xl"
+                style={{ fontFamily: "Orbitron, monospace" }}
+            >
                 POST MUTANT DETAILS
             </h1>
 
@@ -108,8 +113,17 @@ export default function HunterPostDetails({ post, distance, onViewMap }: PostDet
 
             <div className="mt-4 flex gap-4">
                 <ViewPostButton label="View Map" onClick={onViewMap} />
-                <ApplyButton onClick={handleSubmit}/>
+                <ApplyButton
+                    onClick={handleSubmit}
+                    disabled={isApplying || applyDisabled}
+                    disabledLabel={isApplying ? "Applying..." : "Locked"}
+                />
             </div>
+            {applyDisabledMessage && (
+                <p className="mt-3 text-xs text-[#facc15]" style={{ fontFamily: "Fira Code, monospace" }}>
+                    {applyDisabledMessage}
+                </p>
+            )}
         </>
     );
 }

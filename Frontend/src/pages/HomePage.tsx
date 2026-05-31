@@ -1,12 +1,62 @@
-import { useEffect, useRef, useState } from "react"
-import { useNavigate, useLocation } from "react-router-dom"
+import { useCallback, useEffect, useState } from "react"
+import { useNavigate } from "react-router-dom"
 import { useAuth } from "../contexts/AuthContext"
 import api from "../services/api"
-import { getMutantHuntingRequestById } from "../modules/MutantHuntingRequestSystem/mutantHunting.api"
 import SidebarLayout from "../components/SidebarLayout"
 import UserSidebar from "../components/Usersidebar"
 import HunterSidebar from "../components/Huntersidebar"
 import HunterMap from "../components/HunterMap"
+import {
+  acceptMutantHuntingRequest,
+  completeMutantHuntingRequest,
+  getMutantHuntingRequests,
+} from "../modules/MutantHuntingRequestSystem/mutantHunting.api"
+import type {
+  MapPoint,
+  MutantHuntingRequest,
+} from "../modules/MutantHuntingRequestSystem/types/mutantHunting.type"
+
+const BANGKOK_LOCATION: MapPoint = {
+  lat: 13.7563,
+  lng: 100.5018,
+}
+
+const getAutoMatchStorageKey = (hunterId: number) => `hunter-auto-match-${hunterId}`
+
+function getStoredAutoMatchValue(hunterId?: number) {
+  if (!hunterId || typeof window === "undefined") return null
+
+  const storedValue = window.localStorage.getItem(getAutoMatchStorageKey(hunterId))
+  if (storedValue === "true") return true
+  if (storedValue === "false") return false
+
+  return null
+}
+
+function getStoredAutoMatch(hunterId?: number, fallback = false) {
+  return getStoredAutoMatchValue(hunterId) ?? fallback
+}
+
+const ANIMAL_WEIGHTS: Record<string, number> = {
+  WOLF: 10,
+  BEAR: 10,
+  SHARK: 8,
+  BOAR: 7,
+  SNAKE: 7,
+  LIZARD: 6,
+  BIRD: 6,
+  CAT: 2,
+  SPIDER: 5,
+  MONKEY: 3,
+}
+
+const MUTANT_WEIGHTS: Record<string, number> = {
+  SHADOW: 5,
+  POISON: 4,
+  ELECTRIC: 3,
+  ICE: 2,
+  FIRE: 3,
+}
 
 interface Post {
   id: number
@@ -16,8 +66,6 @@ interface Post {
   distance?: string
   reward?: string
   status: string
-  latitude?: number
-  longitude?: number
 }
 
 interface Request {
@@ -25,8 +73,12 @@ interface Request {
   animalType: string
   mutantType: string
   status: string
-  postLatitude?: number
-  postLongitude?: number
+  classRequired: string
+  reward?: string
+  distance?: string
+  picture?: string | null
+  imageUrl?: string | null
+  createdAt?: string
 }
 
 interface Summary {
@@ -40,278 +92,341 @@ interface Summary {
   completedAt?: string
 }
 
-type HuntRequestForNotification = {
-  id: number
-  isAutoMatched: boolean
-  post: {
-    id: number
-    animalType: string
-    mutantType: string
-    reward: string | null
-    latitude: number
-    longitude: number
-  }
+function getWeekStart(date: Date) {
+  const weekStart = new Date(date)
+  weekStart.setHours(0, 0, 0, 0)
+  weekStart.setDate(weekStart.getDate() - weekStart.getDay())
+  return weekStart
+}
+
+function toRadians(value: number) {
+  return (value * Math.PI) / 180
+}
+
+function calculateDistanceKm(from: MapPoint, to: MapPoint) {
+  const earthRadiusKm = 6371
+  const latDistance = toRadians(to.lat - from.lat)
+  const lngDistance = toRadians(to.lng - from.lng)
+  const fromLat = toRadians(from.lat)
+  const toLat = toRadians(to.lat)
+
+  const haversine =
+    Math.sin(latDistance / 2) * Math.sin(latDistance / 2) +
+    Math.cos(fromLat) *
+      Math.cos(toLat) *
+      Math.sin(lngDistance / 2) *
+      Math.sin(lngDistance / 2)
+
+  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine))
+}
+
+function getDistanceLabel(from: MapPoint, request: MutantHuntingRequest) {
+  return `${calculateDistanceKm(from, {
+    lat: request.latitude,
+    lng: request.longitude,
+  }).toFixed(1)} km`
+}
+
+function calculateMissionPowerScore(animalType: string, mutantType: string) {
+  const animalWeight = ANIMAL_WEIGHTS[animalType.trim().toUpperCase()] ?? 1
+  const mutantWeight = MUTANT_WEIGHTS[mutantType.trim().toUpperCase()] ?? 1
+
+  return animalWeight * mutantWeight
+}
+
+function getAcceptedHuntForHunter(request: MutantHuntingRequest, hunterId: number) {
+  return request.huntRequests?.find((huntRequest) => huntRequest.hunterId === hunterId)
+}
+
+function matchesHunter(request: MutantHuntingRequest, hunterId: number) {
+  const directHunterId = request.hunterId ?? request.acceptedById
+  const hasDirectHunter = directHunterId !== null && directHunterId !== undefined
+  const hasHuntRequestHunter = request.huntRequests?.some(
+    (huntRequest) => huntRequest.hunterId !== null && huntRequest.hunterId !== undefined
+  )
+
+  if (hasDirectHunter) return directHunterId === hunterId
+  if (hasHuntRequestHunter) return Boolean(getAcceptedHuntForHunter(request, hunterId))
+
+  return true
+}
+
+function getAcceptedDate(request: MutantHuntingRequest, hunterId: number) {
+  const huntRequest = getAcceptedHuntForHunter(request, hunterId)
+  return (
+    request.acceptedAt ??
+    huntRequest?.acceptedAt ??
+    request.updatedAt ??
+    huntRequest?.updatedAt ??
+    request.createdAt ??
+    huntRequest?.createdAt
+  )
+}
+
+function isCurrentWeek(request: MutantHuntingRequest, hunterId: number) {
+  const acceptedDate = getAcceptedDate(request, hunterId)
+  if (!acceptedDate) return true
+
+  const parsedDate = new Date(acceptedDate)
+  if (Number.isNaN(parsedDate.getTime())) return true
+
+  return parsedDate >= getWeekStart(new Date())
 }
 
 export default function Home() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const location = useLocation()
   const isHunter = user?.accountType === "HUNTER"
-  const mapRef = useRef<HunterMapHandle | null>(null)
 
   const [posts, setPosts] = useState<Post[]>([])
+  const [matchmakingRequests, setMatchmakingRequests] = useState<Request[]>([])
   const [requests, setRequests] = useState<Request[]>([])
   const [summary, setSummary] = useState<Summary[]>([])
+  const [userLocation, setUserLocation] = useState<MapPoint>(BANGKOK_LOCATION)
+  const [deniedMatchIds, setDeniedMatchIds] = useState<number[]>([])
   const [hunterData, setHunterData] = useState({
-    autoMatch: user?.hunter?.autoMatch ?? false,
+    autoMatch: getStoredAutoMatch(user?.hunter?.id, user?.hunter?.autoMatch ?? false),
     rank: user?.hunter?.rank ?? "D",
     rankScore: user?.hunter?.rankScore ?? 0,
   })
-  const [pendingAutoMatch, setPendingAutoMatch] = useState<HuntRequestForNotification | null>(null)
-  const shownIds = useRef<Set<number>>(new Set())
 
-  const refreshHunterRequests = async (hunterId: number) => {
-    const res = await api.get(`/api/hunt-requests?hunterId=${hunterId}`)
-    const data = Array.isArray(res.data) ? res.data : []
-    setRequests(data.map((r: any) => ({
-      id: r.id,
-      animalType: r.post?.animalType ?? "",
-      mutantType: r.post?.mutantType ?? "",
-      status: r.status,
-      postLatitude: r.post?.latitude,
-      postLongitude: r.post?.longitude,
-    })))
-  }
+  const loadHunterProfile = useCallback((hunterId: number) => {
+    api.get(`/api/hunters/${hunterId}`)
+      .then((res) => {
+        const storedAutoMatch = getStoredAutoMatchValue(hunterId)
+        const backendAutoMatch =
+          typeof res.data.autoMatch === "boolean" ? res.data.autoMatch : null
+        const autoMatch = storedAutoMatch ?? backendAutoMatch
 
-  const refreshHunterProfile = async (hunterId: number) => {
-    const res = await api.get(`/api/hunters/${hunterId}`)
-    setHunterData({
-      autoMatch: res.data.autoMatch ?? false,
-      rank: res.data.rank,
-      rankScore: res.data.rankScore,
-    })
-  }
+        setHunterData((current) => ({
+          autoMatch: autoMatch ?? current.autoMatch,
+          rank: res.data.rank,
+          rankScore: res.data.rankScore,
+        }))
 
-  const refreshHunterSummary = async (hunterId: number) => {
-    const res = await api.get(`/api/hunters/${hunterId}/summary/weekly`)
-    const data = res.data.requests ?? []
-    setSummary(data.map((r: any) => ({
-      id: r.id,
-      animalType: r.animalType,
-      mutantType: r.mutantType,
-      classRequired: r.classRequired ?? "",
-      reward: r.reward,
-      powerScore: r.powerScore,
-    })))
-  }
+        if (storedAutoMatch === null && backendAutoMatch !== null) {
+          window.localStorage.setItem(
+            getAutoMatchStorageKey(hunterId),
+            String(backendAutoMatch)
+          )
+        }
+      })
+      .catch(console.error)
+  }, [])
 
-  useEffect(() => {
-    if (!user) return
+  const loadHunterSummary = useCallback((hunterId: number) => {
+    getMutantHuntingRequests()
+      .then((all) => {
+        const hunterClass = user?.hunter?.class ?? "Fighter"
+        const normalizedHunterClass = hunterClass.trim().toLowerCase()
+        const now = Date.now()
+        const matchmaking = hunterData.autoMatch
+          ? all.filter((request) => {
+              const createdAt = request.createdAt ? new Date(request.createdAt).getTime() : now
+              const secondsElapsed = (now - createdAt) / 1000
+              const requiredClasses = request.classRequired
+                .split(",")
+                .map((item) => item.trim().toLowerCase())
 
-    if (!isHunter) {
-      // fetch user's posts
-      api.get(`/api/mutant-hunting-requests`)
-        .then((res) => {
-          const all = res.data.data ?? []
-          const mine = all.filter((p: any) => p.userId === user.id)
-          setPosts(mine.map((p: any) => ({
-            id: p.id,
-            animalType: p.animalType,
-            mutantType: p.mutantType,
-            classRequired: p.classRequired,
-            reward: p.reward,
-            status: p.status,
-            latitude: p.latitude,
-            longitude: p.longitude,
-          })))
-        })
-        .catch(console.error)
-    } else if (user.hunter) {
-      const hunterId = user.hunter.id
+              return (
+                request.status === "MATCHMAKING" &&
+                secondsElapsed < 60 &&
+                !deniedMatchIds.includes(request.id) &&
+                requiredClasses.includes(normalizedHunterClass)
+              )
+            })
+          : []
+        const activeTasks = all.filter(
+          (request) =>
+            (request.status === "ACCEPTED" || request.status === "IN_PROGRESS") &&
+            matchesHunter(request, hunterId)
+        )
+        const completed = all.filter(
+          (request) =>
+            request.status === "COMPLETED" &&
+            matchesHunter(request, hunterId) &&
+            isCurrentWeek(request, hunterId)
+        )
 
-      // fetch hunter profile (for autoMatch + rank)
-      api.get(`/api/hunters/${hunterId}`)
-        .then((res) => {
-          setHunterData({
-            autoMatch: res.data.autoMatch ?? false,
-            rank: res.data.rank,
-            rankScore: res.data.rankScore,
-          })
-        })
-        .catch(console.error)
+        setMatchmakingRequests(matchmaking.map((request) => ({
+          id: request.id,
+          animalType: request.animalType,
+          mutantType: request.mutantType,
+          status: request.status,
+          classRequired: request.classRequired ?? "",
+          reward: request.reward ?? undefined,
+          distance: getDistanceLabel(userLocation, request),
+          picture: request.picture,
+          imageUrl: request.imageUrl,
+          createdAt: request.createdAt,
+        })))
 
-      // fetch hunt requests
-      api.get(`/api/hunt-requests?hunterId=${hunterId}`)
-        .then((res) => {
-          const data = Array.isArray(res.data) ? res.data : []
-          setRequests(data.map((r: any) => ({
-            id: r.id,
-            animalType: r.post?.animalType ?? "",
-            mutantType: r.post?.mutantType ?? "",
-            status: r.status,
-            postLatitude: r.post?.latitude,
-            postLongitude: r.post?.longitude,
-          })))
-        })
-        .catch(console.error)
+        setRequests(activeTasks.map((request) => ({
+          id: request.id,
+          animalType: request.animalType,
+          mutantType: request.mutantType,
+          status: request.status,
+          classRequired: request.classRequired ?? "",
+          reward: request.reward ?? undefined,
+          distance: getDistanceLabel(userLocation, request),
+          picture: request.picture,
+          imageUrl: request.imageUrl,
+        })))
 
-      // fetch weekly summary
-      api.get(`/api/hunters/${hunterId}/summary/weekly`)
-        .then((res) => {
-          const data = res.data.requests ?? []
-          setSummary(data.map((r: any) => ({
-            id: r.id,
-            animalType: r.animalType,
-            mutantType: r.mutantType,
-            classRequired: r.classRequired ?? "",
-            reward: r.reward,
-            powerScore: r.powerScore,
-          })))
-        })
-        .catch(console.error)
+        setSummary(completed.map((request) => ({
+          id: request.id,
+          animalType: request.animalType,
+          mutantType: request.mutantType,
+          classRequired: request.classRequired ?? "",
+          reward: request.reward ?? undefined,
+          powerScore: calculateMissionPowerScore(request.animalType, request.mutantType),
+        })))
+      })
+      .catch(console.error)
+  }, [deniedMatchIds, hunterData.autoMatch, user, userLocation])
+
+  const handleAutoMatchChange = useCallback((next: boolean) => {
+    if (user?.hunter?.id) {
+      window.localStorage.setItem(getAutoMatchStorageKey(user.hunter.id), String(next))
     }
-  }, [user, location.key])
 
-  // poll user posts every 10s so status reflects hunter completions
+    setHunterData((current) => ({
+      ...current,
+      autoMatch: next,
+    }))
+  }, [user])
+
+  const handleAcceptMatchmaking = useCallback((taskId: number) => {
+    if (!user?.hunter) return
+    if (requests.some((request) => request.status === "ACCEPTED" || request.status === "IN_PROGRESS")) {
+      return
+    }
+
+    acceptMutantHuntingRequest(taskId, user.hunter.id)
+      .then(() => {
+        setMatchmakingRequests((current) =>
+          current.filter((request) => request.id !== taskId)
+        )
+        loadHunterSummary(user.hunter!.id)
+        loadHunterProfile(user.hunter!.id)
+      })
+      .catch(console.error)
+  }, [loadHunterProfile, loadHunterSummary, requests, user])
+
+  const handleDenyMatchmaking = useCallback((taskId: number) => {
+    setDeniedMatchIds((current) =>
+      current.includes(taskId) ? current : [...current, taskId]
+    )
+    setMatchmakingRequests((current) =>
+      current.filter((request) => request.id !== taskId)
+    )
+  }, [])
+
+  const handleFinishTask = useCallback((taskId: number) => {
+    if (!user?.hunter) return
+
+    completeMutantHuntingRequest(taskId, user.hunter.id)
+      .then(() => {
+        loadHunterSummary(user.hunter!.id)
+        loadHunterProfile(user.hunter!.id)
+      })
+      .catch(console.error)
+  }, [loadHunterProfile, loadHunterSummary, user])
+
   useEffect(() => {
     if (!user || isHunter) return
-    const interval = setInterval(() => {
-      api.get(`/api/mutant-hunting-requests`).then((res) => {
+
+    api.get(`/api/mutant-hunting-requests`)
+      .then((res) => {
         const all = res.data.data ?? []
         const mine = all.filter((p: any) => p.userId === user.id)
         setPosts(mine.map((p: any) => ({
-          id: p.id, animalType: p.animalType, mutantType: p.mutantType,
-          classRequired: p.classRequired, reward: p.reward, status: p.status,
-          latitude: p.latitude, longitude: p.longitude,
+          id: p.id,
+          animalType: p.animalType,
+          mutantType: p.mutantType,
+          classRequired: p.classRequired,
+          reward: p.reward,
+          status: p.status,
         })))
-      }).catch(() => {})
-    }, 10000)
-    return () => clearInterval(interval)
-  }, [user, isHunter])
-
-  // refresh hunt requests when hunter applies manually
-  useEffect(() => {
-    if (!isHunter || !user?.hunter) return
-    const hunterId = user.hunter.id
-    const refresh = () => {
-      api.get(`/api/hunt-requests?hunterId=${hunterId}`)
-        .then((res) => {
-          const data = Array.isArray(res.data) ? res.data : []
-          setRequests(data.map((r: any) => ({
-            id: r.id,
-            animalType: r.post?.animalType ?? "",
-            mutantType: r.post?.mutantType ?? "",
-            status: r.status,
-            postLatitude: r.post?.latitude,
-            postLongitude: r.post?.longitude,
-          })))
-        })
-        .catch(console.error)
-    }
-    window.addEventListener("hunt-request-applied", refresh)
-    return () => window.removeEventListener("hunt-request-applied", refresh)
+      })
+      .catch(console.error)
   }, [isHunter, user])
 
-  // poll every 5s for auto-match notifications (HUNTER + autoMatch ON only)
   useEffect(() => {
-    if (!isHunter || !user?.hunter || !hunterData.autoMatch) return
+    if (!isHunter || !user?.hunter) return
 
     const hunterId = user.hunter.id
-    const poll = async () => {
-      try {
-        const res = await api.get(`/api/hunt-requests?hunterId=${hunterId}`)
-        const data: any[] = Array.isArray(res.data) ? res.data : []
-        // always update sidebar requests
-        setRequests(data.map((r: any) => ({
-          id: r.id,
-          animalType: r.post?.animalType ?? "",
-          mutantType: r.post?.mutantType ?? "",
-          status: r.status,
-          postLatitude: r.post?.latitude,
-          postLongitude: r.post?.longitude,
-        })))
-        // check for new auto-match popup
-        const match = data.find(
-          (r) => r.status === "PENDING" && r.isAutoMatched && !shownIds.current.has(r.id)
-        )
-        if (match) {
-          shownIds.current.add(match.id)
-          setPendingAutoMatch(match)
-        }
-      } catch {
-        // silent
-      }
+
+    setHunterData((current) => ({
+      ...current,
+      autoMatch: getStoredAutoMatch(hunterId, user.hunter!.autoMatch ?? current.autoMatch),
+      rank: user.hunter!.rank ?? current.rank,
+      rankScore: user.hunter!.rankScore ?? current.rankScore,
+    }))
+
+    loadHunterProfile(hunterId)
+  }, [isHunter, loadHunterProfile, user])
+
+  useEffect(() => {
+    if (!isHunter || !user?.hunter) return
+
+    loadHunterSummary(user.hunter.id)
+  }, [isHunter, loadHunterSummary, user])
+
+  useEffect(() => {
+    if (!isHunter || !user?.hunter) return
+
+    const intervalId = window.setInterval(() => {
+      loadHunterSummary(user.hunter!.id)
+      loadHunterProfile(user.hunter!.id)
+    }, 3000)
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [isHunter, loadHunterProfile, loadHunterSummary, user])
+
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      setUserLocation(BANGKOK_LOCATION)
+      return
     }
 
-    poll()
-    const interval = setInterval(poll, 3000)
-    return () => clearInterval(interval)
-  }, [isHunter, user, hunterData.autoMatch])
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        setUserLocation({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        })
+      },
+      () => {
+        setUserLocation(BANGKOK_LOCATION)
+      },
+    )
 
-  const handleAutoMatchAccept = async (req: HuntRequestForNotification) => {
-    if (!user?.hunter) return
-    try {
-      await api.patch(`/api/hunt-requests/${req.id}`, { status: "ACCEPTED_BY_USER" })
-      await Promise.all([
-        refreshHunterRequests(user.hunter.id),
-        refreshHunterProfile(user.hunter.id),
-      ])
-      mapRef.current?.flyTo(req.post.latitude, req.post.longitude, 15)
-      getMutantHuntingRequestById(req.post.id)
-        .then((post) => mapRef.current?.selectPost(post))
-        .catch(() => {})
-    } catch (err) {
-      console.error("Accept failed", err)
+    return () => {
+      navigator.geolocation.clearWatch(watchId)
     }
-    setPendingAutoMatch(null)
-  }
-
-  const handleAutoMatchDecline = async (req: HuntRequestForNotification) => {
-    if (!user?.hunter) return
-    try {
-      await api.patch(`/api/hunt-requests/${req.id}`, { status: "DECLINED_BY_HUNTER" })
-      await refreshHunterRequests(user.hunter.id)
-    } catch (err) {
-      console.error("Decline failed", err)
-    }
-    setPendingAutoMatch(null)
-  }
-
-  const handleDismissRequest = async (id: number, status: string) => {
-    if (status === "PENDING") {
-      await api.patch(`/api/hunt-requests/${id}`, { status: "DECLINED_BY_HUNTER" }).catch(() => {})
-    }
-    setRequests((prev) => prev.filter((r) => r.id !== id))
-  }
-
-  const handleCompleteRequest = async (requestId: number) => {
-    if (!user?.hunter) return
-    try {
-      await api.patch(`/api/hunt-requests/${requestId}`, { status: "COMPLETED" })
-      await Promise.all([
-        refreshHunterRequests(user.hunter.id),
-        refreshHunterProfile(user.hunter.id),
-        refreshHunterSummary(user.hunter.id),
-      ])
-    } catch (err) {
-      console.error("Complete failed", err)
-    }
-  }
+  }, [])
 
   if (!user) return null
 
+  const hasActiveTask = requests.some(
+    (request) => request.status === "ACCEPTED" || request.status === "IN_PROGRESS"
+  )
+
   return (
-    <>
-    {pendingAutoMatch && (
-      <AutoMatchNotification
-        huntRequest={pendingAutoMatch}
-        onAccept={handleAutoMatchAccept}
-        onDecline={handleAutoMatchDecline}
-      />
-    )}
     <SidebarLayout
-      map={<HunterMap isHunter={isHunter} />}
+      map={
+        <HunterMap
+          role={isHunter ? "hunter" : "user"}
+          hunterId={user.hunter?.id}
+          hasActiveTask={hasActiveTask}
+          onRequestsChanged={
+            user.hunter ? () => loadHunterSummary(user.hunter!.id) : undefined
+          }
+        />
+      }
       sidebar={
         isHunter && user.hunter ? (
           <HunterSidebar
@@ -326,21 +441,23 @@ export default function Home() {
               avatarUrl: user.avatarUrl,
               autoMatch: hunterData.autoMatch,
             }}
+            matchmakingRequests={matchmakingRequests}
             requests={requests}
             summary={summary}
-            onSelectRequest={(lat, lng) => mapRef.current?.flyTo(lat, lng, 15)}
-            onCompleteRequest={handleCompleteRequest}
+            hasActiveTask={hasActiveTask}
+            onAutoMatchChange={handleAutoMatchChange}
+            onAcceptMatchmaking={handleAcceptMatchmaking}
+            onDenyMatchmaking={handleDenyMatchmaking}
+            onFinishTask={handleFinishTask}
           />
         ) : (
           <UserSidebar
             user={{ id: user.id, name: user.name, email: user.email, avatarUrl: user.avatarUrl }}
             posts={posts}
             onCreatePost={() => navigate("/user/create-post")}
-            onSelectPost={(lat, lng) => mapRef.current?.flyTo(lat, lng, 15)}
           />
         )
       }
     />
-    </>
   )
 }

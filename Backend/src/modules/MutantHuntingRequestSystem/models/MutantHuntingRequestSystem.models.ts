@@ -2,6 +2,7 @@ export type MutantHuntingRequestStatus =
   | "MATCHMAKING"
   | "PUBLIC"
   | "ACCEPTED"
+  | "IN_PROGRESS"
   | "COMPLETED";
 
 export interface CreateMutantHuntingRequestBody {
@@ -24,5 +25,9 @@ export interface DeleteMutantHuntingRequestBody {
 }
 
 export interface AcceptMutantHuntingRequestBody {
+  hunterId?: number;
+}
+
+export interface CompleteMutantHuntingRequestBody {
   hunterId?: number;
 }

@@ -16,12 +16,51 @@ const RANK_THRESHOLDS: Record<string, number> = {
   S: 1000, A: 700, B: 400, C: 200, D: 0,
 }
 
-const calculateRank = (score: number): string => {
+const getRewardText = (reward: string | null | undefined): string =>
+  reward?.trim() ? reward : "No Reward"
+
+export const calculateRank = (score: number): string => {
   if (score >= 1000) return "S"
   if (score >= 700) return "A"
   if (score >= 400) return "B"
   if (score >= 200) return "C"
   return "D"
+}
+
+export const calculateHuntPowerScore = (
+  animalType: string,
+  mutantType: string
+): number => {
+  const animalWeight = ANIMAL_WEIGHTS[animalType.trim().toUpperCase()] ?? 1
+  const mutantWeight = MUTANT_WEIGHTS[mutantType.trim().toUpperCase()] ?? 1
+
+  return animalWeight * mutantWeight
+}
+
+export const calculateHunterRankScore = async (hunterId: number): Promise<number> => {
+  const completedRequests = await prisma.huntRequest.findMany({
+    where: {
+      hunterId,
+      status: { in: ["COMPLETED"] },
+    },
+    include: { post: true },
+  })
+
+  return completedRequests.reduce(
+    (total, request) =>
+      total + calculateHuntPowerScore(request.post.animalType, request.post.mutantType),
+    0
+  )
+}
+
+export const syncHunterRankScore = async (hunterId: number) => {
+  const rankScore = await calculateHunterRankScore(hunterId)
+  const rank = calculateRank(rankScore)
+
+  return prisma.hunter.update({
+    where: { id: hunterId },
+    data: { rankScore, rank },
+  })
 }
 
 // Hunter apply
@@ -58,10 +97,7 @@ export const applyHuntRequest = async (hunterId: number, postId: number) => {
   const request = await prisma.huntRequest.create({
     data: { postId, hunterId, status: "ACCEPTED_BY_USER" },
   })
-  await Promise.all([
-    prisma.post.update({ where: { id: postId }, data: { status: "MATCHED" } }),
-    prisma.hunter.update({ where: { id: hunterId }, data: { autoMatch: false } }),
-  ])
+  await prisma.post.update({ where: { id: postId }, data: { status: "MATCHED" } })
   return request
 }
 
@@ -110,38 +146,20 @@ export const updateHuntRequestStatus = async (
 
   // if complete calc rank
   if (data.status === "COMPLETED") {
-    const powerScore =
-      ANIMAL_WEIGHTS[huntRequest.post.animalType] *
-      MUTANT_WEIGHTS[huntRequest.post.mutantType]
-
-    const hunter = await prisma.hunter.findUnique({
-      where: { id: huntRequest.hunterId },
-    })
-
-    const newScore = (hunter?.rankScore ?? 0) + powerScore
-    const newRank = calculateRank(newScore)
-
-    await prisma.hunter.update({
-      where: { id: huntRequest.hunterId },
-      data: { rankScore: newScore, rank: newRank, autoMatch: true },
-    })
-
     // update post status
     await prisma.post.update({
       where: { id: huntRequest.postId },
       data: { status: "COMPLETED" },
     })
+
+    await syncHunterRankScore(huntRequest.hunterId)
   }
 
-  // if accepted: update post to MATCHED + disable hunter autoMatch
+  // if accepted: update post to MATCHED
   if (data.status === "ACCEPTED_BY_USER") {
     await prisma.post.update({
       where: { id: huntRequest.postId },
       data: { status: "MATCHED" },
-    })
-    await prisma.hunter.update({
-      where: { id: huntRequest.hunterId },
-      data: { autoMatch: false },
     })
   }
 
@@ -230,7 +248,7 @@ export const getHuntRequests = async (
   postId?: number,
   hunterId?: number
 ) => {
-  return await prisma.huntRequest.findMany({
+  const requests = await prisma.huntRequest.findMany({
     where: {
       ...(postId && { postId }),
       ...(hunterId && { hunterId }),
@@ -245,4 +263,12 @@ export const getHuntRequests = async (
     },
     orderBy: { createdAt: "desc" },
   })
+
+  return requests.map((request) => ({
+    ...request,
+    post: {
+      ...request.post,
+      reward: getRewardText(request.post.reward),
+    },
+  }))
 }
