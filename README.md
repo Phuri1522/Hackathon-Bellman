@@ -8,6 +8,12 @@ After two different dimensions connected, dangerous mutant animals began appeari
 2. Hunt Matching (Matching System (user’s post and hunter), Hunter rank (by completing the quest)) 861
 3. Mutant World Mapping: Live Map that changes interface depending on your roles (user/hunter) uses real GPS location. 866
 
+# MEMBER 
+ 1. 68130500861 MR.Thanakrit Mararam (Hunt Matching)
+ 2. 68130500862 MR.Thanapat Buaphan (Mutant Hunting Request System)
+ 3. 68130500866 MR.Ponchayadit Khochitmet (Mutant World Mapping)
+
+
 # Technology Stack
 
 ## Frontend
