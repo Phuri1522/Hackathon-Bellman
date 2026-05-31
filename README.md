@@ -1,4 +1,4 @@
-# Hackathon
+# Hackathon-Bellman
 
 # Scope
 After two different dimensions connected, dangerous mutant animals began appearing, putting normal people in danger because they have no direct way to report these creatures or call for quick help. To solve this problem and keep communities safe, Mutant Hunt Network provides a central platform with a live map. Its distinct features include a smart interface that changes depending on whether you are a citizen or a hunter, a live map that uses real GPS locations to show glowing monster marks, and an automatic matching system. This system connects dangerous tasks with the right hunters to catch the creatures safely.
