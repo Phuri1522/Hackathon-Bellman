@@ -4,9 +4,9 @@
 After two different dimensions connected, dangerous mutant animals began appearing, putting normal people in danger because they have no direct way to report these creatures or call for quick help. To solve this problem and keep communities safe, Mutant Hunt Network provides a central platform with a live map. Its distinct features include a smart interface that changes depending on whether you are a citizen or a hunter, a live map that uses real GPS locations to show glowing monster marks, and an automatic matching system. This system connects dangerous tasks with the right hunters to catch the creatures safely.
 
 # Key Features
-1. Mutant Hunting Request System (Create a post (user), Delete a post (user), View post overlay (user & hunter), Post details (user & hunter), Apply post (hunter)) 862
-2. Hunt Matching (Matching System (user’s post and hunter), Hunter rank (by completing the quest)) 861
-3. Mutant World Mapping: Live Map that changes interface depending on your roles (user/hunter) uses real GPS location. 866
+1. Mutant Hunting Request System (Create a post (user), Delete a post (user), View post overlay (user & hunter), Post details (user & hunter), Apply post (hunter))
+2. Hunt Matching (Matching System (user’s post and hunter), Hunter rank (by completing the quest))
+3. Mutant World Mapping: Live Map that changes interface depending on your roles (user/hunter) uses real GPS location.
 
 # MEMBER 
  1. 68130500861 MR.Thanakrit Mararam (Hunt Matching)
