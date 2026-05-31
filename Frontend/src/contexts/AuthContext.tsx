@@ -7,6 +7,7 @@ interface Hunter {
   class: string
   rank: string
   rankScore: number
+  autoMatch?: boolean
 }
 
 interface User {

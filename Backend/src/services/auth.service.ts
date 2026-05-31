@@ -51,6 +51,7 @@ export const register = async (data: RegisterInput) => {
           class: hunter.class,
           rank: hunter.rank,
           rankScore: hunter.rankScore,
+          autoMatch: hunter.autoMatch,
         },
       },
     }
@@ -121,6 +122,7 @@ export const login = async (email: string, password: string) => {
         class: user.hunter.class,
         rank: user.hunter.rank,
         rankScore: user.hunter.rankScore,
+        autoMatch: user.hunter.autoMatch,
       } : null,
     },
   }

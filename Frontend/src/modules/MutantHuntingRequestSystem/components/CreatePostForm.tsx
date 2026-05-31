@@ -5,6 +5,8 @@ import SubmitSightingButton from "./SubmitSightingButton";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { createMutantHuntingRequest } from "../mutantHunting.api";
+import api from "../../../services/api";
+import { useAuth } from "../../../contexts/AuthContext";
 
 import {
     ANIMAL_TYPES,
@@ -14,7 +16,6 @@ import {
 } from "../types/mutantHunting.type";
 
 const DEFAULT_IMAGE_URL = "https://images.unsplash.com/photo-1546182990-dffeafbe841d";
-const STATIC_USER_ID = 1;
 
 type HunterClass = "FIGHTER" | "TANKER" | "RANGER";
 
@@ -54,6 +55,7 @@ export default function CreatePostForm({
     onPreviewChange,
 }: CreatePostFormProps) {
     const navigate = useNavigate();
+    const { user } = useAuth();
     const [showSuccess, setShowSuccess] = useState(false);
     const [showError, setShowError] = useState(false);
     const [errorMessage, setErrorMessage] = useState("Failed to submit post");
@@ -108,8 +110,8 @@ export default function CreatePostForm({
         setIsSubmitting(true);
 
         try {
-            await createMutantHuntingRequest({
-                userId: STATIC_USER_ID,
+            const newPost = await createMutantHuntingRequest({
+                userId: user?.id ?? 0,
                 animalType,
                 mutantType,
                 requiredClass,
@@ -119,6 +121,10 @@ export default function CreatePostForm({
                 latitude: selectedPin.lat,
                 longitude: selectedPin.lng,
             });
+
+            if (newPost?.data?.id) {
+                api.post("/api/hunt-requests/auto-match", { postId: newPost.data.id }).catch(() => {});
+            }
 
             resetForm();
             setShowSuccess(true);

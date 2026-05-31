@@ -1,17 +1,40 @@
-import { useEffect, useRef, useState } from "react";
-import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from "react-leaflet";
-import { divIcon } from "leaflet";
-import "leaflet/dist/leaflet.css";
-import { getMapMarkers } from "../apis/map";
-import type { MapMarkerData } from "../types/map";
+import "leaflet/dist/leaflet.css"
+import { divIcon } from "leaflet"
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react"
+import { useLocation } from "react-router-dom"
+import {
+  MapContainer,
+  Marker,
+  TileLayer,
+  Tooltip,
+  useMap,
+  useMapEvents,
+} from "react-leaflet"
+import PostPinOverlay from "../modules/MutantHuntingRequestSystem/components/PostPinOverlay"
+import UserPostDetails from "../modules/MutantHuntingRequestSystem/components/UserPostDetails"
+import HunterPostDetails from "../modules/MutantHuntingRequestSystem/components/HunterPostDetails"
+import {
+  deleteMutantHuntingRequest,
+  getMutantHuntingRequests,
+} from "../modules/MutantHuntingRequestSystem/mutantHunting.api"
+import type {
+  MapPoint,
+  MutantHuntingRequest,
+} from "../modules/MutantHuntingRequestSystem/types/mutantHunting.type"
 
-// ─── Props ───────────────────────────────────────────────────────────────────
-interface HunterMapProps {
-  isHunter?: boolean;
+type Role = "user" | "hunter"
+
+type HunterMapProps = {
+  role?: Role
 }
 
-// ─── Leaflet Custom Icons ─────────────────────────────────────────────────────
-// ใช้ divIcon เหมือนกับที่เพื่อนออกแบบใน RealMap.tsx (สีส้ม = mutant marker)
+const BANGKOK_LOCATION: MapPoint = {
+  lat: 13.7563,
+  lng: 100.5018,
+}
+
+const defaultCenter: [number, number] = [BANGKOK_LOCATION.lat, BANGKOK_LOCATION.lng]
+
 const mutantIcon = divIcon({
   className: "",
   html: `<div style="
@@ -25,15 +48,70 @@ const mutantIcon = divIcon({
   "></div>`,
   iconSize: [18, 18],
   iconAnchor: [9, 9],
-});
+})
 
-// ─── Overlay Component ────────────────────────────────────────────────────────
-// แปลง lat/lng → pixel แล้ว render PostPinOverlay style popup ลอยเหนือ marker
-function PostOverlay({
-  marker,
-  isHunter,
-  onClose,
-  onViewPost,
+const userLocationIcon = divIcon({
+  className: "",
+  html: '<div style="height:16px;width:16px;border-radius:9999px;background:#39ff14;border:2px solid #050505;box-shadow:0 0 18px #39ff14;"></div>',
+  iconSize: [16, 16],
+  iconAnchor: [8, 8],
+})
+
+function getPostTitle(post: MutantHuntingRequest) {
+  return `${post.mutantType} ${post.animalType}`
+}
+
+function toRadians(value: number) {
+  return (value * Math.PI) / 180
+}
+
+function calculateDistanceKm(from: MapPoint, to: MapPoint) {
+  const earthRadiusKm = 6371
+  const latDistance = toRadians(to.lat - from.lat)
+  const lngDistance = toRadians(to.lng - from.lng)
+  const fromLat = toRadians(from.lat)
+  const toLat = toRadians(to.lat)
+
+  const haversine =
+    Math.sin(latDistance / 2) * Math.sin(latDistance / 2) +
+    Math.cos(fromLat) *
+      Math.cos(toLat) *
+      Math.sin(lngDistance / 2) *
+      Math.sin(lngDistance / 2)
+
+  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine))
+}
+
+function MapClickCloser({ onClose }: { onClose: () => void }) {
+  useMapEvents({
+    click() {
+      onClose()
+    },
+  })
+
+  return null
+}
+
+export type HunterMapHandle = {
+  flyTo: (lat: number, lng: number, zoom: number) => void
+  selectPost: (post: MutantHuntingRequest) => void
+}
+
+type FlyToHandle = { flyTo: (lat: number, lng: number, zoom: number) => void }
+
+function MapFlyController({ innerRef }: { innerRef: React.Ref<FlyToHandle> }) {
+  const map = useMap()
+  useImperativeHandle(innerRef, () => ({
+    flyTo(lat, lng, zoom) {
+      map.flyTo([lat, lng], zoom)
+    },
+  }))
+  return null
+}
+
+function SelectedPostMapController({
+  focusTarget,
+  focusRequest,
 }: {
   marker: MapMarkerData;
   isHunter: boolean;
@@ -141,28 +219,80 @@ function PostOverlay({
         }}
       />
     </div>
-  );
+  )
 }
 
-// ─── Click-outside handler ────────────────────────────────────────────────────
-function MapClickHandler({ onMapClick }: { onMapClick: () => void }) {
-  useMapEvents({
-    click() {
-      onMapClick();
+const HunterMap = forwardRef<HunterMapHandle, HunterMapProps>(function HunterMap({ role = "hunter" }, ref) {
+  const flyRef = useRef<FlyToHandle>(null)
+  const location = useLocation()
+  const [posts, setPosts] = useState<MutantHuntingRequest[]>([])
+  const [selectedPost, setSelectedPost] = useState<MutantHuntingRequest | null>(null)
+  const [showMiniOverlay, setShowMiniOverlay] = useState(false)
+  const [showDetails, setShowDetails] = useState(false)
+  const [userLocation, setUserLocation] = useState<MapPoint>(BANGKOK_LOCATION)
+  const [focusRequest, setFocusRequest] = useState(0)
+  const [focusTarget, setFocusTarget] = useState<MapPoint | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [notification, setNotification] = useState<string | null>(null)
+
+  useImperativeHandle(ref, () => ({
+    flyTo(lat, lng, zoom) {
+      flyRef.current?.flyTo(lat, lng, zoom)
     },
-  });
-  return null;
-}
+    selectPost(post) {
+      setSelectedPost(post)
+      setShowMiniOverlay(true)
+      setShowDetails(true)
+    },
+  }))
 
-// ─── Main Component ───────────────────────────────────────────────────────────
-export default function HunterMap({ isHunter = false }: HunterMapProps) {
-  const defaultCenter: [number, number] = [13.7563, 100.5018]; // กรุงเทพฯ
-  const [markers, setMarkers] = useState<MapMarkerData[]>([]);
-  const [selectedMarker, setSelectedMarker] = useState<MapMarkerData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const selectedPostDistance = useMemo(() => {
+    if (!selectedPost) return "0.0 km"
 
-  // ดึงข้อมูล markers จาก Backend และ poll ทุก 3 วินาที
+    return `${calculateDistanceKm(userLocation, {
+      lat: selectedPost.latitude,
+      lng: selectedPost.longitude,
+    }).toFixed(1)} km`
+  }, [selectedPost, userLocation])
+
+  const loadPosts = useCallback(() => {
+    getMutantHuntingRequests()
+      .then((requests) => {
+        setPosts(requests.filter((request) => request.status === "PUBLIC"))
+      })
+      .catch(console.error)
+  }, [])
+
+  useEffect(() => {
+    loadPosts()
+  }, [loadPosts, location.key])
+
+  useEffect(() => {
+    const state = location.state as { notification?: string } | null
+    if (!state?.notification) return
+
+    setNotification(state.notification)
+    const timeoutId = window.setTimeout(() => {
+      setNotification(null)
+    }, 2500)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [location.state])
+
+  useEffect(() => {
+    window.addEventListener("focus", loadPosts)
+    window.addEventListener("mutant-hunting-request-created", loadPosts)
+    const intervalId = window.setInterval(loadPosts, 8000)
+
+    return () => {
+      window.removeEventListener("focus", loadPosts)
+      window.removeEventListener("mutant-hunting-request-created", loadPosts)
+      window.clearInterval(intervalId)
+    }
+  }, [loadPosts])
+
   useEffect(() => {
     let isFirstFetch = true;
 
@@ -215,49 +345,91 @@ export default function HunterMap({ isHunter = false }: HunterMapProps) {
         </div>
       )}
 
-      <MapContainer
-        center={defaultCenter}
-        zoom={13}
-        style={{ height: "100%", width: "100%", zIndex: 0 }}
-        attributionControl={false}
-      >
-        {/* Dark map tile เหมือนกับที่เพื่อนใช้ใน RealMap.tsx */}
-        <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-          attribution='&copy; <a href="https://carto.com/">CARTO</a>'
-        />
-
-        {/* ปิด overlay เมื่อ click บน map */}
-        <MapClickHandler onMapClick={() => setSelectedMarker(null)} />
-
-        {/* วาง Marker บน map ทุก Post ที่ status=OPEN */}
-        {markers.map((marker) => (
-          <Marker
-            key={marker.id}
-            position={[marker.latitude, marker.longitude]}
-            icon={mutantIcon}
-            eventHandlers={{
-              click: (e) => {
-                // หยุด event ไม่ให้ไปถึง MapClickHandler
-                e.originalEvent.stopPropagation();
-                setSelectedMarker(
-                  selectedMarker?.id === marker.id ? null : marker
-                );
-              },
-            }}
+      <div className={`relative ${showDetails ? "h-[42vh] w-full md:h-full md:w-[60%]" : "h-full w-full"}`}>
+        <button
+          onClick={() => flyRef.current?.flyTo(userLocation.lat, userLocation.lng, 15)}
+          className="absolute bottom-5 right-5 z-500 bg-[#0f1115] border border-[#39ff14] text-[#39ff14] rounded px-3 py-2 text-xs hover:bg-[#39ff1415] transition-colors shadow-lg"
+          style={{ fontFamily: "Orbitron, monospace" }}
+        >
+          ◎ ME
+        </button>
+        <MapContainer
+          center={defaultCenter}
+          zoom={13}
+          scrollWheelZoom
+          zoomControl
+          attributionControl={false}
+          className="h-full w-full"
+        >
+          <SelectedPostMapController
+            focusTarget={focusTarget}
+            focusRequest={focusRequest}
           />
-        ))}
+          <MapClickCloser onClose={handleMapSpaceClick} />
 
-        {/* Overlay popup แบบ custom ── แสดงเมื่อ marker ถูกเลือก */}
-        {selectedMarker && (
-          <PostOverlay
-            marker={selectedMarker}
-            isHunter={isHunter}
-            onClose={() => setSelectedMarker(null)}
-            onViewPost={handleViewPost}
+          <TileLayer
+            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+            attribution='&copy; <a href="https://carto.com/">CARTO</a>'
           />
-        )}
-      </MapContainer>
+
+          <Marker position={[userLocation.lat, userLocation.lng]} icon={userLocationIcon}>
+            <Tooltip direction="top" offset={[0, -8]}>
+              Your location
+            </Tooltip>
+          </Marker>
+
+          {posts.map((post) => (
+            <Marker
+              key={post.id}
+              position={[post.latitude, post.longitude]}
+              icon={mutantIcon}
+              eventHandlers={{
+                click(event) {
+                  event.originalEvent.stopPropagation()
+                  handlePostMarkerClick(post)
+                },
+              }}
+            >
+              <Tooltip direction="top" offset={[0, -8]}>
+                {getPostTitle(post)}
+              </Tooltip>
+            </Marker>
+          ))}
+
+          {selectedPost && (
+            <PostOverlayMarker
+              post={selectedPost}
+              isVisible={showMiniOverlay}
+              onOverlayClick={() => {
+                setShowMiniOverlay(true)
+                setShowDetails(true)
+              }}
+            />
+          )}
+          <MapFlyController innerRef={flyRef} />
+        </MapContainer>
+      </div>
+
+      {showDetails && selectedPost && (
+        <section className="h-[58vh] w-full animate-[fadeInRight_0.25s_ease-out] overflow-y-auto bg-[#0f1115] px-5 py-5 md:h-full md:w-[40%] md:px-10 md:py-6">
+          {role === "user" ? (
+            <UserPostDetails
+              post={selectedPost}
+              distance={selectedPostDistance}
+              onViewMap={handleViewMap}
+              onDelete={handleDeleteSelectedPost}
+            />
+          ) : (
+            <HunterPostDetails
+              post={selectedPost}
+              distance={selectedPostDistance}
+              onViewMap={handleViewMap}
+            />
+          )}
+        </section>
+      )}
     </div>
-  );
-}
+  )
+})
+
+export default HunterMap

@@ -2,6 +2,7 @@ import ViewPostButton from "./ViewPostButton";
 import ApplyButton from "./ApplyButton";
 import { useState } from "react";
 import type { MutantHuntingRequest } from "../types/mutantHunting.type";
+import api from "../../../services/api";
 
 const POST_DETAILS = {
     animalType: "Wolf",
@@ -38,6 +39,8 @@ function DetailField({ label, value }: { label: string; value: string }) {
 
 export default function HunterPostDetails({ post, distance, onViewMap }: PostDetailsProps) {
     const [showSuccess, setShowSuccess] = useState(false);
+    const [showError, setShowError] = useState(false);
+    const [errorMessage, setErrorMessage] = useState("");
     const details = {
         animalType: post?.animalType ?? POST_DETAILS.animalType,
         mutantType: post?.mutantType ?? POST_DETAILS.mutantType,
@@ -47,12 +50,19 @@ export default function HunterPostDetails({ post, distance, onViewMap }: PostDet
         distance: distance ?? POST_DETAILS.distance,
         imageUrl: post?.picture ?? post?.imageUrl ?? POST_DETAILS.imageUrl,
     };
-    function handleSubmit() {
-        setShowSuccess(true);
-
-        setTimeout(() => {
-            setShowSuccess(false);
-        }, 2500);
+    async function handleSubmit() {
+        if (!post) return;
+        try {
+            await api.post("/api/hunt-requests", { postId: post.id });
+            setShowSuccess(true);
+            window.dispatchEvent(new Event("hunt-request-applied"));
+            setTimeout(() => setShowSuccess(false), 2500);
+        } catch (err: any) {
+            const msg = err?.response?.data?.error ?? "Failed to apply";
+            setErrorMessage(msg);
+            setShowError(true);
+            setTimeout(() => setShowError(false), 2500);
+        }
     }
 
     return (
@@ -60,6 +70,11 @@ export default function HunterPostDetails({ post, distance, onViewMap }: PostDet
             {showSuccess && (
                 <div className="fixed right-5 top-5 z-50 rounded border border-[#39ff14] bg-[#0f1115] px-5 py-3 text-sm text-[#39ff14] shadow-[0_0_14px_rgba(57,255,20,0.35)]">
                     Room applied
+                </div>
+            )}
+            {showError && (
+                <div className="fixed right-5 top-5 z-50 rounded border border-[#b7410e] bg-[#0f1115] px-5 py-3 text-sm text-[#ff7a45] shadow-[0_0_14px_rgba(183,65,14,0.35)]">
+                    {errorMessage}
                 </div>
             )}
             <h1 className="text-2xl font-bold text-[#39ff14] md:text-4xl">

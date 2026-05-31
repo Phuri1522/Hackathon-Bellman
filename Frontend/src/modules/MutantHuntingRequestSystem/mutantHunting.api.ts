@@ -37,6 +37,13 @@ export async function getMutantHuntingRequests(): Promise<MutantHuntingRequest[]
   return result.data ?? [];
 }
 
+export async function getMutantHuntingRequestById(id: number): Promise<MutantHuntingRequest> {
+  const response = await fetch(`${API_BASE_URL}/mutant-hunting-requests/${id}`);
+  if (!response.ok) throw new Error("Failed to fetch post");
+  const result = await response.json();
+  return result.data ?? result;
+}
+
 export async function deleteMutantHuntingRequest(id: number, userId: number) {
   const response = await fetch(`${API_BASE_URL}/mutant-hunting-requests/${id}`, {
     method: "DELETE",

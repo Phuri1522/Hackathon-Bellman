@@ -6,6 +6,8 @@ import LogoutModal from "./LogoutModal"
 
 const STATUS_COLOR: Record<string, string> = {
   OPEN: "border-[#39ff14] text-[#39ff14]",
+  MATCHMAKING: "border-[#facc15] text-[#facc15]",
+  PUBLIC: "border-[#39ff14] text-[#39ff14]",
   MATCHED: "border-[#facc15] text-[#facc15]",
   COMPLETED: "border-[#9ca3af] text-[#9ca3af]",
 }
@@ -18,6 +20,8 @@ interface Post {
   distance?: string
   reward?: string
   status: string
+  latitude?: number
+  longitude?: number
 }
 
 interface User {
@@ -31,9 +35,10 @@ interface Props {
   user: User
   posts: Post[]
   onCreatePost?: () => void
+  onSelectPost?: (lat: number, lng: number) => void
 }
 
-export default function UserSidebar({ user, posts, onCreatePost }: Props) {
+export default function UserSidebar({ user, posts, onCreatePost, onSelectPost }: Props) {
   const { logout } = useAuth()
   const navigate = useNavigate()
   const [showProfile, setShowProfile] = useState(false)
@@ -51,7 +56,7 @@ export default function UserSidebar({ user, posts, onCreatePost }: Props) {
         <div className="flex items-center gap-3 p-4 border-b border-[#2d3748]">
           <button
             onClick={() => setShowProfile(true)}
-            className="w-10 h-10 rounded-full bg-[#2d3748] border-2 border-[#39ff14] overflow-hidden flex items-center justify-center hover:opacity-80 transition-opacity flex-shrink-0"
+            className="w-10 h-10 rounded-full bg-[#2d3748] border-2 border-[#39ff14] overflow-hidden flex items-center justify-center hover:opacity-80 transition-opacity shrink-0"
           >
             {user.avatarUrl
               ? <img src={user.avatarUrl} className="w-full h-full object-cover" />
@@ -69,7 +74,7 @@ export default function UserSidebar({ user, posts, onCreatePost }: Props) {
           {/* Mobile: logout top right */}
           <button
             onClick={() => setShowLogout(true)}
-            className="md:hidden text-[#b7410e] text-xs border border-[#b7410e] rounded px-2 py-1 hover:bg-[#b7410e15] transition-colors flex-shrink-0"
+            className="md:hidden text-[#b7410e] text-xs border border-[#b7410e] rounded px-2 py-1 hover:bg-[#b7410e15] transition-colors shrink-0"
             style={{ fontFamily: "Orbitron, monospace" }}
           >
             LOGOUT
@@ -87,7 +92,11 @@ export default function UserSidebar({ user, posts, onCreatePost }: Props) {
             </p>
           )}
           {posts.map((post) => (
-            <div key={post.id} className="border border-[#2d3748] rounded-lg p-3 bg-[#050505]">
+            <div
+              key={post.id}
+              className={`border border-[#2d3748] rounded-lg p-3 bg-[#050505] transition-colors ${post.latitude ? "cursor-pointer hover:border-[#39ff14]" : ""}`}
+              onClick={() => post.latitude && post.longitude && onSelectPost?.(post.latitude, post.longitude)}
+            >
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-1">
                   <span className="text-[#e5e7eb] text-xs font-bold" style={{ fontFamily: "Fira Code, monospace" }}>{post.animalType}</span>
@@ -122,7 +131,7 @@ export default function UserSidebar({ user, posts, onCreatePost }: Props) {
             {/* PC: small logout button bottom right */}
             <button
               onClick={() => setShowLogout(true)}
-              className="hidden md:flex items-center justify-center border border-[#b7410e] text-[#b7410e] rounded px-3 py-2 text-xs hover:bg-[#b7410e15] transition-colors flex-shrink-0"
+              className="hidden md:flex items-center justify-center border border-[#b7410e] text-[#b7410e] rounded px-3 py-2 text-xs hover:bg-[#b7410e15] transition-colors shrink-0"
               style={{ fontFamily: "Orbitron, monospace" }}
             >
               LOGOUT
