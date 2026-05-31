@@ -58,3 +58,7 @@ setInterval(async () => {
     }
   } catch {}
 }, 20000)
+
+app.use("/api/hunters", hunterRouter);
+app.use("/api/hunt-requests", huntRequestRouter);
+app.use("/api/users", userRouter);
